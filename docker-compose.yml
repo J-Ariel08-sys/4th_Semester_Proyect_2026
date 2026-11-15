@@ -1,14 +1,59 @@
 services:
   postgres-db:
     image: postgres:16-alpine
-    container_name: unifranz_postgres
     environment:
       POSTGRES_DB: rotes_clinicos_db
       POSTGRES_USER: unifranz_user
-      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-siclin_local_only}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unifranz_user -d rotes_clinicos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    ports:
+      - "127.0.0.1:8025:8025"
+  optimizer:
+    build: ./optimizer-quarkus
+    ports:
+      - "127.0.0.1:8081:8081"
+  portal:
+    build: ./portal
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000", "--no-reload"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_DATABASE: rotes_clinicos_db
+      DB_USERNAME: unifranz_user
+      DB_PASSWORD: ${DB_PASSWORD:-siclin_local_only}
+      OPTIMIZER_URL: http://optimizer:8081
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_FROM_ADDRESS: siclin@local.test
+      MAIL_FROM_NAME: SICLIN
+      PHP_CLI_SERVER_WORKERS: 4
+    volumes:
+      - ./portal:/app
+      - portal_vendor:/app/vendor
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      optimizer:
+        condition: service_started
 volumes:
   pgdata:
+  portal_vendor:

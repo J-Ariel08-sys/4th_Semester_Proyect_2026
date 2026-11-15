@@ -1,0 +1,1 @@
+<x-layout title="Acceso restringido"><section class="card"><p class="eyebrow">403 · PERMISOS</p><h1>Tu rol no permite esta acción</h1><p>Vuelve a tu panel para consultar las opciones disponibles.</p><a class="button" href="{{ route('dashboard') }}">Volver al panel</a></section></x-layout>
