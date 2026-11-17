@@ -19,13 +19,13 @@ class ShiftPlanner
         $weekStart = CarbonImmutable::parse(min(array_column($slots, 'starts_at')))->startOfWeek();
         $weekEnd = CarbonImmutable::parse(max(array_column($slots, 'ends_at')))->endOfWeek();
         foreach ($slots as $index => $slot) {
-            $assignment = DB::table('assignments')->join('cycles', 'cycles.id', '=', 'assignments.cycle_id')->join('places', 'places.id', '=', 'assignments.place_id')->join('users', 'users.id', '=', 'assignments.user_id')->join('hospitals', 'hospitals.id', '=', 'places.hospital_id')->where('assignments.id', $slot['assignment_id'])->select('assignments.*', 'cycles.starts_on', 'cycles.ends_on', 'places.hospital_id', 'users.active', 'hospitals.active as hospital_active', 'hospitals.agreement_until')->first();
+            $assignment = DB::table('assignments')->join('cycles', 'cycles.id', '=', 'assignments.cycle_id')->join('places', 'places.id', '=', 'assignments.place_id')->join('users', 'users.id', '=', 'assignments.user_id')->join('hospitals', 'hospitals.id', '=', 'places.hospital_id')->where('assignments.id', $slot['assignment_id'])->select('assignments.*', 'cycles.starts_on', 'cycles.ends_on', 'cycles.specialty_id', 'cycles.status as cycle_status', 'users.eligible', 'places.hospital_id', 'users.active', 'hospitals.active as hospital_active', 'hospitals.agreement_until')->first();
             $start = CarbonImmutable::parse($slot['starts_at']);
             $end = CarbonImmutable::parse($slot['ends_at']);
-            if (! $assignment || ! $assignment->active || ! $assignment->hospital_active || $assignment->agreement_until < $assignment->ends_on || $start->lt(CarbonImmutable::parse($assignment->starts_on)) || $end->gt(CarbonImmutable::parse($assignment->ends_on)->endOfDay()) || $end->lte($start) || $start->diffInHours($end) > 24) {
+            if (! $assignment || ! $assignment->active || ! $assignment->eligible || $assignment->cycle_status !== 'publicada' || $assignment->status !== 'aprobada' || ! $assignment->hospital_active || $assignment->agreement_until < $assignment->ends_on || $start->lt(CarbonImmutable::parse($assignment->starts_on)) || $end->gt(CarbonImmutable::parse($assignment->ends_on)->endOfDay()) || $end->lte($start) || $start->diffInHours($end) > 24) {
                 throw ValidationException::withMessages(['slots' => 'Guardia fuera del rote, de más de 24 horas o asignación inactiva.']);
             }
-            $tutors = DB::table('users')->where('role', 'tutor')->where('active', true)->whereIn('id', DB::table('places')->where('hospital_id', $assignment->hospital_id)->select('tutor_id'))->orderBy('id')->pluck('id')->all();
+            $tutors = DB::table('users')->where('role', 'tutor')->where('active', true)->whereIn('id', DB::table('places')->join('cycles','cycles.id','=','places.cycle_id')->where('places.hospital_id', $assignment->hospital_id)->where('cycles.specialty_id',$assignment->specialty_id)->where('cycles.starts_on','<=',$start->toDateString())->where('cycles.ends_on','>=',$end->toDateString())->select('places.tutor_id'))->orderBy('id')->pluck('id')->all();
             $allowed = [];
             foreach ($tutors as $tutor) {
                 if (! isset($loads[$tutor])) {
@@ -39,19 +39,37 @@ class ShiftPlanner
             $prepared[] = ['id' => (string) $index, 'assignment_id' => (int) $slot['assignment_id'], 'user_id' => $assignment->user_id, 'starts_at' => $start->toDateTimeString(), 'ends_at' => $end->toDateTimeString(), 'inicio' => $start->timestamp, 'fin' => $end->timestamp, 'allowed' => $allowed];
         }
 
-        return [$prepared, $loads];
+        $availableMinutes = [];
+        foreach (array_keys($loads) as $tutor) {
+            $intervals = DB::table('availabilities')->where('tutor_id', $tutor)->where('starts_at', '<', $weekEnd)->where('ends_at', '>', $weekStart)->orderBy('starts_at')->get();
+            $endPrevious = $weekStart->timestamp; $minutes = 0;
+            foreach ($intervals as $interval) {
+                $start = max($weekStart->timestamp, $endPrevious, CarbonImmutable::parse($interval->starts_at)->timestamp);
+                $end = min($weekEnd->timestamp, CarbonImmutable::parse($interval->ends_at)->timestamp);
+                $minutes += max(0, $end - $start) / 60;
+                $endPrevious = max($endPrevious, $end);
+            }
+            $availableMinutes[$tutor] = $minutes;
+        }
+        return [$prepared, $loads, $availableMinutes];
     }
 
     public function plan(array $slots, int $restHours, ?int $excludeBatch = null): array
     {
-        [$prepared,$loads] = $this->prepare($slots, $restHours, $excludeBatch);
-        $input = ['turnos' => array_map(fn ($s) => ['id' => $s['id'], 'internoId' => (string) $s['user_id'], 'inicio' => $s['inicio'], 'fin' => $s['fin'], 'tutoresPermitidos' => $s['allowed']], $prepared), 'cargaPreviaMinutos' => (object) $loads, 'descansoHoras' => $restHours, 'segundos' => 2];
-        try {
-            $result = Http::timeout(40)->connectTimeout(5)->post(config('services.optimizer.url').'/api/guardias', $input)->throw()->json();
-        } catch (ConnectionException|RequestException $e) {
-            report($e);
-            throw ValidationException::withMessages(['guardias' => 'El planificador no está disponible. Reintenta el cálculo.']);
-        }
+        return $this->calculateSnapshot($this->snapshot($slots, $restHours, $excludeBatch))['slots'];
+    }
+
+    public function snapshot(array $slots, int $restHours, ?int $excludeBatch = null): array
+    {
+        [$prepared,$loads,$availableMinutes] = $this->prepare($slots, $restHours, $excludeBatch);
+        $input = ['turnos' => array_map(fn ($s) => ['id' => $s['id'], 'internoId' => (string) $s['user_id'], 'inicio' => $s['inicio'], 'fin' => $s['fin'], 'tutoresPermitidos' => $s['allowed']], $prepared), 'cargaPreviaMinutos' => $loads, 'disponibilidadMinutos' => $availableMinutes, 'descansoHoras' => $restHours, 'segundos' => 2];
+        return compact('prepared', 'input');
+    }
+
+    public function calculateSnapshot(array $snapshot): array
+    {
+        $prepared=$snapshot['prepared'];
+        $result=app(ShiftOptimizer::class)->solve($snapshot['input']);
         if (! is_array($result) || ($result['hardScore'] ?? -1) !== 0 || ! is_array($result['turnos'] ?? null) || count($result['turnos']) !== count($prepared)) {
             throw ValidationException::withMessages(['guardias' => 'Respuesta inválida del planificador.']);
         }
@@ -68,9 +86,8 @@ class ShiftPlanner
             $tutor = $byId[$s['id']]['tutorId'];
             $planned[] = ['assignment_id' => $s['assignment_id'], 'user_id' => $s['user_id'], 'starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at'], 'tutor_id' => $tutor === null ? null : (int) $tutor, 'reason' => $tutor === null ? 'Sin cobertura factible en esta propuesta. Revisa disponibilidad y descansos.' : null];
         }
-        $this->validatePlan($planned, $restHours, $excludeBatch, false);
 
-        return $planned;
+        return ['slots'=>$planned,'diagnostic'=>collect($result)->except('turnos')->all()];
     }
 
     public function validatePlan(array $slots, int $restHours, ?int $excludeBatch = null, bool $requireComplete = true): void

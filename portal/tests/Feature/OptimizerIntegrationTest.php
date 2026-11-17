@@ -11,11 +11,8 @@ class OptimizerIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_real_quarkus_generates_scenarios_and_an_approvable_proposal(): void
+    public function test_php_engine_generates_scenarios_rotations_and_shifts_end_to_end(): void
     {
-        if (getenv('RUN_INTEGRATION') !== '1') {
-            $this->markTestSkipped('Ejecutar con RUN_INTEGRATION=1 y Quarkus activo.');
-        }
         $this->seed();
         $cycle = DB::table('cycles')->first();
         $places = DB::table('places')->pluck('id')->all();
@@ -36,7 +33,9 @@ class OptimizerIntegrationTest extends TestCase
         $this->post(route('scenarios.choose', $study->id), ['chosen' => 'A3', 'justification' => 'Política elegida en prueba de integración real.'])->assertSessionHasNoErrors();
         $this->post(route('rotations.generate', $cycle->id), ['study_id' => $study->id])->assertSessionHasNoErrors();
         $run = DB::table('optimization_runs')->first();
+        $this->post(route('rotations.review', $run->id))->assertSessionHasNoErrors();
         $this->post(route('rotations.approve', $run->id))->assertSessionHasNoErrors();
+        $this->post(route('rotations.publish', $run->id))->assertSessionHasNoErrors();
         $this->assertDatabaseCount('assignments', 3);
         $this->assertDatabaseHas('cycles', ['id' => $cycle->id, 'status' => 'publicada']);
         $assignment = DB::table('assignments')->orderBy('id')->first();

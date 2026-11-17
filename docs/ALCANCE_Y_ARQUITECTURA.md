@@ -12,11 +12,11 @@ El informe original describe cinco grupos funcionales y menciona A3, escenarios 
 |---|---|---|
 | 1. Sesiones, usuarios y seguridad | Autenticación, cuatro roles, habilitación de cuentas, bloqueo por intentos, recuperación, cierre de sesión, bitácora y notificaciones | Correos reales, política de cuentas, despliegue HTTPS y respaldo |
 | 2. Gestión hospitalaria y académica | Hospitales/convenios, especialidades, convocatorias, cupos/reservas, tutores, promedio y méritos, importación CSV atómica | Convenios reales, rúbrica de méritos, fuentes académicas, capacidad autorizada |
-| 3. Postulación y optimización | Preferencias ordenadas, ventana temporal, comprobante QR privado, Timefold, propuestas, validación de versión y aprobación transaccional | Secuencia curricular anual, requisitos específicos por plaza, regla final de prioridad |
+| 3. Postulación y optimización | Preferencias ordenadas, ventana temporal, comprobante QR privado, motor PHP (`RotationOptimizer`), propuestas, validación de versión y aprobación transaccional | Secuencia curricular anual, requisitos específicos por plaza, regla final de prioridad |
 | 4. Ajustes y seguimiento | Incidencias/resolución, asistencia, rúbrica de cuatro competencias, reasignación previa al inicio, permutas con doble consentimiento y reoptimización | Rúbrica oficial, ausencias justificadas, cambios durante un rote ya iniciado |
 | 5. Libreta, actas y reportes | Libreta individual, asistencia/notas, ocupación, actas PDF, historial y verificación QR/SHA-256 | Membrete/formato oficial, firma digital institucional, integración SEDES |
 | 6. Escenarios | Matriz manual, cinco criterios, empates, sensibilidad de α, simulación de nueve combinaciones, política justificada | Escenarios calibrados, función de utilidad aprobada y datos observados |
-| 7. Guardias y tutores | Disponibilidad, Timefold para supervisores, cobertura/carga, cruces y descansos, aprobación y cumplimiento | Descanso oficial, límites semanales, ratios de supervisión y especialidades habilitadas por tutor |
+| 7. Guardias y tutores | Disponibilidad, motor PHP (`ShiftOptimizer`), cobertura/carga, cruces y descansos, aprobación y cumplimiento | Descanso oficial, límites semanales, ratios de supervisión y especialidades habilitadas por tutor |
 
 No se almacena información de pacientes. Los roles operativos implementados son administrador, coordinador, tutor e interno. La autoridad SEDES, paciente y dirección de carrera aparecen de forma inconsistente en el informe; no se añadieron accesos institucionales sin una definición de permisos y procesos. Coordinación dispone de reportes para la demostración.
 
@@ -24,18 +24,19 @@ No se almacena información de pacientes. Los roles operativos implementados son
 
 ```mermaid
 flowchart LR
-    U[Administrador / Coordinador / Tutor / Interno] --> L[Laravel 13 · Blade y CSS]
+    U[Administrador / Coordinador / Tutor / Interno] --> N[Nginx 1.28 · Proxy inverso]
+    N --> L[Laravel 13 · PHP-FPM 8.5]
     L --> P[(PostgreSQL 16)]
-    L -->|JSON · rotes y guardias| Q[Quarkus · Timefold]
-    Q -->|Propuesta y puntuación| L
-    L --> F[PDF y QR · archivos privados]
-    L --> M[Mailpit · correo local de prueba]
+    L -->|Queue optimization| W[Worker PHP · Rotation/Shift Optimizer]
+    W -->|Propuesta en BD| P
+    L -->|Queue mail| M[Mailpit · SMTP 1025]
+    L --> F[PDF y QR · Archivos privados]
 ```
 
 - Laravel es responsable de permisos, datos, estado, formularios, validaciones, publicación y documentos.
-- Quarkus recibe una instantánea y devuelve propuestas; no escribe asignaciones en la base ni las aprueba.
-- PostgreSQL conserva el historial y las relaciones. El motor no depende de esa base.
-- Los siete módulos no requieren siete microservicios.
+- El worker de optimización procesa cálculos en segundo plano (`OptimizeRotations`, `ComputeShifts`, `ComputeScenario`) sin bloquear la interfaz web.
+- PostgreSQL conserva el historial, las relaciones, las colas y las sesiones.
+- Los siete módulos se ejecutan en un backend unificado y cohesionado.
 
 ## Entidades
 
@@ -103,13 +104,12 @@ La recuperación y publicación generan correos capturados por Mailpit en el ent
 
 ## Evidencia de validación en desarrollo
 
-Validado el 14 de noviembre de 2026 en este entorno:
+Validado el 16 de noviembre de 2026 en este entorno:
 
-- 19 pruebas Laravel con PostgreSQL y Quarkus reales; integración de escenarios, asignación y guardias.
-- 12 pruebas Java, sin fallos: API, restricciones, preferencias, guardias y escala del informe.
-- Ejemplo de 180 internos/45 grupos: aproximadamente 2,1 segundos en esta máquina, con 180 asignados y cero violaciones duras. No es una garantía para cualquier conjunto de restricciones o hardware.
-- Acceso HTTP real al portal y carga de las pantallas protegidas con sesión de administrador.
-- Revisión visual en Firefox del acceso y panel; CSS responsive para pantallas estrechas.
-- PDF real generado y comprobado por las pruebas; privacidad de actas consolidadas y comprobantes individuales.
-
-Los tests rápidos aíslan la base con SQLite en memoria. La suite de integración usa `siclin_test` y no altera los datos de demostración en `rotes_clinicos_db`.
+- 40 pruebas en PHPUnit ejecutadas contra PostgreSQL real (`siclin_test`) con 469 aserciones y 0 fallos.
+- 4 pruebas de navegador de punta a punta con Playwright y Chromium (100% pasando).
+- Ejemplo de escala de 180 internos / 45 grupos de cupos: resuelto en ~210 ms con 180 asignados y 0 violaciones duras.
+- Acceso HTTP real al portal (http://localhost:8000) y Mailpit (http://localhost:8025) con contenedores Docker healthy.
+- Comprobación de OTP por SMTP real capturado en Mailpit e invalidación de sesiones previas tras recuperación.
+- Verificación visual y funcional de roles (administrador, coordinador, tutor, interno) en anchos responsive de 320, 390, 768 y 1280 px.
+- PDF y QR criptográfico comprobados; privacidad de actas consolidadas y comprobantes individuales garantizada por Gates.

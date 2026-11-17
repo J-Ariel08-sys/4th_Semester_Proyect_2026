@@ -1,0 +1,26 @@
+name: SICLIN PHP y PostgreSQL
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+      - name: Construir y arrancar sin credenciales externas
+        run: ./scripts/dev-up.sh
+      - name: PostgreSQL e integración real del motor PHP
+        run: ./scripts/test.sh
+      - name: Navegador, OTP SMTP local y permisos
+        run: ./scripts/e2e.sh
+      - name: Diagnóstico de infraestructura
+        run: ./scripts/diagnose.sh
+      - name: Estado final de contenedores
+        if: always()
+        run: docker compose ps -a

@@ -18,6 +18,8 @@
         </include>
     </source>
     <php>
+        <server force="true" name="OTP_SECRET" value="test-otp-secret-only-for-isolated-tests-12345"/>
+        <server force="true" name="OPTIMIZER_SECRET" value="siclin-test-service-secret-32-characters"/>
         <server force="true" name="APP_ENV" value="testing"/>
         <server force="true" name="APP_MAINTENANCE_DRIVER" value="file"/>
         <server force="true" name="BCRYPT_ROUNDS" value="4"/>
@@ -25,7 +27,7 @@
         <server force="true" name="CACHE_STORE" value="array"/>
         <server force="true" name="DB_CONNECTION" value="pgsql"/>
         <server force="true" name="DB_DATABASE" value="siclin_test"/>
-        <server force="true" name="DB_HOST" value="postgres-db"/>
+        
         <server force="true" name="DB_PORT" value="5432"/>
         <server force="true" name="DB_URL" value=""/>
         <server force="true" name="MAIL_MAILER" value="array"/>

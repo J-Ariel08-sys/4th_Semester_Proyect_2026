@@ -13,26 +13,25 @@ La primera construcción descarga PHP, Java, PostgreSQL y dependencias; puede ta
 
 El script:
 
-1. Copia `portal/.env.example` a `portal/.env` si no existe.
-2. Construye e inicia PostgreSQL, Quarkus, Laravel y Mailpit.
-3. Genera `APP_KEY` si falta.
-4. Aplica migraciones sin eliminar registros.
-5. Carga la demostración si la tabla de usuarios está vacía.
+1. Prepara las claves privadas y secretos en `.env`.
+2. Construye e inicia PostgreSQL, Nginx, PHP-FPM, Workers y Mailpit.
+3. Aplica migraciones sin eliminar registros.
+4. Carga la demostración si la tabla de usuarios está vacía.
 
 Abre **http://localhost:8000**. Usa siempre este mismo host para no mezclar cookies de `localhost` y `127.0.0.1`.
 
 ```bash
 docker compose ps
-curl http://localhost:8081/health
+curl http://localhost:8000/up
 ```
 
-Esperado: contenedores activos y salud `UP`. Para consultar problemas:
+Esperado: contenedores activos y estado `healthy`. Para consultar problemas:
 
 ```bash
-docker compose logs --tail=100 portal optimizer postgres-db
+docker compose logs --tail=100 web app postgres-db
 ```
 
-Si los puertos 8000, 8081, 5432 o 8025 están ocupados, cambia su lado izquierdo en `docker-compose.yml`. Si cambias el puerto del portal, actualiza también `APP_URL` en Compose. No publiques estos puertos a Internet para la prueba.
+Si los puertos 8000, 5432 o 8025 están ocupados, cambia su lado izquierdo en `docker-compose.yml`. Si cambias el puerto del portal, actualiza también `APP_URL` en Compose. No publiques estos puertos a Internet para la prueba.
 
 ## 2. Cuentas de demostración
 
@@ -194,7 +193,7 @@ En un rote futuro sin registros ni guardias, Coordinación puede elegir una plaz
 1. Como tutor, abre Guardias y tutores y registra disponibilidad. Solo puedes registrar la propia.
 2. Como coordinador, crea un calendario, por ejemplo “Semana de demostración”. Configura descanso mínimo 12 horas (valor de prueba, pendiente de norma institucional).
 3. Añade uno o varios turnos con interno/rote, inicio y fin dentro del periodo del rote. El botón “Añadir turno” permite varias filas.
-4. Timefold asigna tutores disponibles del hospital; primero busca cobertura y luego equilibrio de minutos de supervisión.
+4. El motor PHP (`ShiftOptimizer`) asigna tutores disponibles del hospital; primero busca cobertura y luego equilibrio de minutos de supervisión.
 5. Revisa turnos pendientes. Ningún lote incompleto debe aprobarse.
 6. Aprueba el calendario completo. Revisa la carga publicada por tutor.
 7. Intenta crear un turno superpuesto o con descanso insuficiente para el mismo tutor/interno: debe quedar pendiente y no publicarse.
@@ -228,39 +227,30 @@ Como coordinador o administrador, consulta acceso, configuración, postulación,
 ### Laravel aislado
 
 ```bash
+### Pruebas automatizadas en PostgreSQL real (PHPUnit)
+
+```bash
 ./scripts/test.sh
 ```
 
-SQLite en memoria; no altera los datos demo. La prueba de integración real aparece omitida a propósito si no activas `RUN_INTEGRATION`.
+El script prepara la base `siclin_test` con usuario aislado y ejecuta la suite completa de 40 pruebas en PHPUnit (469 aserciones). Incluye:
+- Flujo integral de postulación, aprobación y publicación con PostgreSQL real.
+- Motor PHP `RotationOptimizer` (benchmark de 180 internos / 45 grupos de cupos en ~210 ms).
+- Motor PHP `ShiftOptimizer` (planificación de guardias con disponibilidad y descansos).
+- Criterios de decisión bajo incertidumbre (Maximin, Maximax, Laplace, Hurwicz, Savage).
+- Seguridad OTP, HMAC, políticas de reintento, invalidación de sesiones y control de roles.
 
-### Quarkus
-
-```bash
-cd optimizer-quarkus
-./mvnw test
-```
-
-Prueba capacidad, reserva, habilitación, preferencias, errores de entrada, guardias y escala de 180 internos/45 grupos de plazas. Requiere Java 21; el wrapper descarga Maven. Alternativamente puedes ejecutarlo en un contenedor Maven montando `optimizer-quarkus`.
-
-### PostgreSQL y Quarkus reales
-
-Con los servicios activos, crea una base **separada** una sola vez:
+### Pruebas de navegador de punta a punta (Playwright + Mailpit)
 
 ```bash
-docker compose exec postgres-db psql -U unifranz_user -d postgres -c 'CREATE DATABASE siclin_test;'
+./scripts/e2e.sh
 ```
 
-Si ya existe, omite ese comando. Ejecuta:
-
-```bash
-docker compose exec -T \
-  -e APP_ENV=testing -e RUN_INTEGRATION=1 \
-  -e DB_CONNECTION=pgsql -e DB_DATABASE=siclin_test \
-  -e SESSION_DRIVER=array -e CACHE_STORE=array -e MAIL_MAILER=array \
-  portal php vendor/bin/phpunit --configuration phpunit.pgsql.xml
-```
-
-La prueba utiliza los mismos endpoints de aplicación con PostgreSQL real. La integración llama a Quarkus sin simular sus respuestas, calcula nueve escenarios, aprueba tres asignaciones y planifica una guardia. Los correos de esta prueba se mantienen en memoria.
+El script levanta una instancia aislada (`siclin-e2e`) con base de datos propia (`siclin_e2e_test`) y Mailpit en el puerto 8026, ejecutando 4 pruebas completas con Chromium:
+1. Activación y recuperación OTP con códigos recibidos realmente por SMTP en Mailpit, sesiones previas invalidadas y consumo concurrente.
+2. Navegación responsive y menús de los 4 roles en anchos de 320, 390, 768 y 1280 px.
+3. Postulación de 3 internos, cálculo asíncrono en cola de optimización, revisión, aprobación, publicación y generación/verificación de actas PDF y QR.
+4. Registro de asistencia por tutor, rúbrica de cuatro competencias, cumplimiento de guardia y generación de libreta académica individual en PDF.
 
 ## 13. Reinicios y errores frecuentes
 

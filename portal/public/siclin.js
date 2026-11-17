@@ -32,3 +32,25 @@ document.querySelectorAll('[data-rubric-toggle]').forEach(toggle => {
     });
   });
 });
+const navToggle = document.querySelector('.nav-toggle');
+navToggle?.addEventListener('click', () => {
+  const expanded = navToggle.getAttribute('aria-expanded') !== 'true';
+  navToggle.setAttribute('aria-expanded', String(expanded));
+  document.querySelector('#navigation').classList.toggle('open', expanded);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && navToggle?.getAttribute('aria-expanded') === 'true') { navToggle.click(); navToggle.focus(); }
+});
+document.querySelectorAll('[data-run-status]').forEach(async element => {
+  const poll = async () => {
+    try {
+      const response = await fetch(element.dataset.runStatus, {headers:{Accept:'application/json'}});
+      if (!response.ok) throw new Error();
+      const run = await response.json();
+      element.textContent = `Cálculo: ${run.execution_status} · Plan: ${run.plan_status}`;
+      if (['en_cola','ejecutando'].includes(run.execution_status)) setTimeout(poll, 2500);
+      else if (element.dataset.initial !== run.execution_status) location.reload();
+    } catch { element.textContent = 'No se pudo consultar el progreso. Recarga la página para reintentar.'; }
+  };
+  if (['en_cola','ejecutando'].includes(element.dataset.initial)) poll();
+});

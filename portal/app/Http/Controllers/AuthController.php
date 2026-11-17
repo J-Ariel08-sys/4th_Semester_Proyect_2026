@@ -19,12 +19,12 @@ class AuthController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $data = $request->validate(['email' => 'required|email|max:255', 'password' => 'required|string|max:255']);
-        $data['email'] = Str::lower($data['email']);
+        $data['email'] = Str::lower(trim($data['email']));
         $key = 'login:'.hash('sha256', $data['email']);
         if (RateLimiter::tooManyAttempts($key, 5)) {
             return back()->withErrors(['email' => 'Demasiados intentos. Intenta nuevamente en '.RateLimiter::availableIn($key).' segundos.']);
         }
-        if (! Auth::attempt([...$data, 'active' => true])) {
+        if (! Auth::attempt([...$data, 'active' => true, fn ($query) => $query->whereNotNull('activated_at')])) {
             RateLimiter::hit($key, 300);
             Audit::record('sesion.fallida', ['identificador' => hash('sha256', $data['email'])]);
 
@@ -32,6 +32,7 @@ class AuthController extends Controller
         }
         RateLimiter::clear($key);
         $request->session()->regenerate();
+        $request->session()->put('security_version', Auth::user()->security_version);
         Audit::record('sesion.inicio');
 
         return redirect()->intended(route('dashboard'));
@@ -47,23 +48,4 @@ class AuthController extends Controller
         return redirect()->route('login');
     }
 
-    public function emailReset(Request $request): RedirectResponse
-    {
-        $request->validate(['email' => 'required|email']);
-        Password::sendResetLink(['email' => Str::lower($request->string('email')->toString())]);
-
-        return back()->with('status', 'Si la cuenta existe, recibirás un enlace para restablecer la contraseña.');
-    }
-
-    public function reset(Request $request): RedirectResponse
-    {
-        $data = $request->validate(['token' => 'required', 'email' => 'required|email', 'password' => ['required', 'confirmed', PasswordRule::min(12)->letters()->numbers()]]);
-        $status = Password::reset($data, function (User $user, string $password) {
-            $user->forceFill(['password' => Hash::make($password), 'remember_token' => Str::random(60)])->save();
-            DB::table('sessions')->where('user_id', $user->id)->delete();
-            Audit::record('clave.restablecida', ['usuario' => $user->id]);
-        });
-
-        return $status === Password::PASSWORD_RESET ? redirect()->route('login')->with('status', 'Contraseña actualizada.') : back()->withErrors(['email' => 'El enlace es inválido o ha caducado.']);
-    }
 }

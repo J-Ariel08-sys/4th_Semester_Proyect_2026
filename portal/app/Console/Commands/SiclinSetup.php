@@ -18,7 +18,8 @@ class SiclinSetup extends Command
             return self::FAILURE;
         }
         if (! config('app.key')) {
-            $this->call('key:generate', ['--force' => true]);
+            $this->error('Configura APP_KEY con scripts/init-env.py antes de iniciar.');
+            return self::FAILURE;
         }
         if ($this->call('migrate', ['--force' => true]) !== 0) {
             return self::FAILURE;

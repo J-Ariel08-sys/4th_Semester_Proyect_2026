@@ -11,7 +11,7 @@ class RoleMiddleware
 {
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        if (! $request->user()?->active) {
+        if (! $request->user()?->active || ($request->session()->has('security_version') && $request->session()->get('security_version') !== $request->user()->security_version)) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

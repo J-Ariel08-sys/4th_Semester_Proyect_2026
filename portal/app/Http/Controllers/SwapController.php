@@ -73,6 +73,8 @@ class SwapController extends Controller
                 throw ValidationException::withMessages(['permuta' => 'Las asignaciones cambiaron. Solicita una nueva permuta.']);
             }
             $this->validateAssignments([$source, $target]);
+            \App\Services\AssignmentHistory::capture($source, 'Permuta #'.$swap);
+            \App\Services\AssignmentHistory::capture($target, 'Permuta #'.$swap);
             DB::table('assignments')->where('id', $source->id)->update(['place_id' => $target->place_id, 'tutor_id' => $target->tutor_id, 'updated_at' => now()]);
             DB::table('assignments')->where('id', $target->id)->update(['place_id' => $source->place_id, 'tutor_id' => $source->tutor_id, 'updated_at' => now()]);
             DB::table('swap_requests')->where('id', $swap)->update(['status' => 'aprobada', 'updated_at' => now()]);

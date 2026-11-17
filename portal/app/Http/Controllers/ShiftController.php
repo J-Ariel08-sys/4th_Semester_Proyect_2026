@@ -13,7 +13,7 @@ class ShiftController extends Controller
 {
     public function index(): View
     {
-        $manager = in_array(auth()->user()->role, ['administrador', 'coordinador']);
+        $manager = (auth()->user()->role === 'coordinador');
         $assignments = ClinicalController::assignments()->get();
         $tutors = DB::table('users')->where('role', 'tutor')->where('active', true)->get();
         $availability = DB::table('availabilities')->join('users', 'users.id', '=', 'availabilities.tutor_id')->when(! $manager, fn ($q) => $q->where('tutor_id', auth()->id()))->select('availabilities.*', 'users.name')->orderBy('starts_at')->get();
@@ -23,6 +23,12 @@ class ShiftController extends Controller
         $batches = $manager ? DB::table('shift_batches')->orderByDesc('id')->get() : collect();
 
         return view('shifts', compact('assignments', 'tutors', 'availability', 'shifts', 'batches', 'manager'));
+    }
+
+    public function status(int $batch): \Illuminate\Http\JsonResponse
+    {
+        $row=DB::table('shift_batches')->find($batch); abort_unless($row,404);
+        return response()->json(['execution_status'=>$row->execution_status,'plan_status'=>$row->status]);
     }
 
     public function availability(Request $request): RedirectResponse
@@ -42,17 +48,14 @@ class ShiftController extends Controller
     public function generate(Request $request, ShiftPlanner $planner): RedirectResponse
     {
         $data = $request->validate(['name' => 'required|string|max:150', 'rest_hours' => 'required|integer|between:0,48', 'slots' => 'required|array|min:1|max:100', 'slots.*.assignment_id' => 'required|integer|exists:assignments,id', 'slots.*.starts_at' => 'required|date', 'slots.*.ends_at' => 'required|date']);
-        $planned = $planner->plan($data['slots'], (int) $data['rest_hours']);
-        DB::transaction(function () use ($data, $planned) {
-            $id = DB::table('shift_batches')->insertGetId(['name' => $data['name'], 'rest_hours' => $data['rest_hours'], 'created_by' => auth()->id(), 'created_at' => now(), 'updated_at' => now()]);
-            foreach ($planned as $slot) {
-                unset($slot['user_id']);
-                DB::table('shifts')->insert([...$slot, 'batch_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
-            }
-            Audit::record('guardias.propuestas', ['lote' => $id]);
+        $snapshot = $planner->snapshot($data['slots'], (int) $data['rest_hours']);
+        DB::transaction(function () use ($data, $snapshot) {
+            $id=DB::table('shift_batches')->insertGetId(['name'=>$data['name'],'rest_hours'=>$data['rest_hours'],'created_by'=>auth()->id(),'input'=>json_encode(['slots'=>$data['slots'],'snapshot'=>$snapshot]),'input_hash'=>hash('sha256',json_encode($snapshot)), 'execution_status'=>'en_cola','created_at'=>now(),'updated_at'=>now()]);
+            \App\Jobs\ComputeShifts::dispatch($id)->onQueue('optimization')->afterCommit();
+            Audit::record('guardias.encoladas',['lote'=>$id]);
         });
 
-        return back()->with('status', 'Calendario propuesto. Revisa los turnos pendientes y la carga antes de aprobar.');
+        return back()->with('status', 'Calendario encolado. Revisa su progreso y los conflictos antes de aprobar.');
     }
 
     public function approve(ShiftPlanner $planner, int $batch): RedirectResponse
@@ -61,7 +64,12 @@ class ShiftController extends Controller
             DB::table('users')->orderBy('id')->lockForUpdate()->get();
             $row = DB::table('shift_batches')->where('id', $batch)->lockForUpdate()->first();
             abort_unless($row, 404);
-            abort_unless($row->status === 'propuesta', 409);
+            abort_unless($row->status === 'propuesta' && $row->execution_status === 'completada', 409);
+            if ($row->input) {
+                $input=json_decode($row->input,true);
+                $current=$planner->snapshot($input['slots'], $row->rest_hours, $batch);
+                if (hash('sha256',json_encode($current)) !== $row->input_hash) { throw \Illuminate\Validation\ValidationException::withMessages(['guardias'=>'Cambió la disponibilidad o el plan publicado. Calcula un calendario nuevo.']); }
+            }
             $slots = DB::table('shifts')->where('batch_id', $batch)->orderBy('starts_at')->orderBy('assignment_id')->get()->map(fn ($s) => (array) $s)->all();
             $planner->validatePlan($slots, $row->rest_hours, $batch);
             DB::table('shift_batches')->where('id', $batch)->update(['status' => 'aprobada', 'updated_at' => now()]);

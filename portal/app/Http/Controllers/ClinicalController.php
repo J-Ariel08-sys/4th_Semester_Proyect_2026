@@ -24,7 +24,8 @@ class ClinicalController extends Controller
             $query->where('assignments.tutor_id', auth()->id());
         }
 
-        return $query;
+        if (auth()->user()->role === 'administrador') { $query->whereRaw('1 = 0'); }
+        return $query->where('assignments.status', 'aprobada')->where('cycles.status', 'publicada');
     }
 
     public function index(): View
@@ -52,7 +53,9 @@ class ClinicalController extends Controller
             if (count($data['competencies']) !== 4) {
                 throw ValidationException::withMessages(['competencies' => 'Completa los cuatro criterios de la rúbrica.']);
             }
-            $data['grade'] = (int) round(array_sum($data['competencies']) / 4);
+            $weights = \App\Services\Settings::rubric();
+            $data['grade'] = (int) round(collect($data['competencies'])->sum(fn ($value, $key) => $value * $weights[$key] / 100));
+            $data['rubric_snapshot'] = json_encode($weights);
             $data['competencies'] = json_encode($data['competencies']);
         }
         DB::transaction(function () use ($assignment, $data) {
@@ -113,6 +116,7 @@ class ClinicalController extends Controller
             if (DB::table('assignments')->where('place_id', $place->id)->count() >= $place->capacity - $place->reserve) {
                 throw ValidationException::withMessages(['place_id' => 'La plaza no tiene cupos utilizables.']);
             }
+            \App\Services\AssignmentHistory::capture($row, 'Reasignación: '.$data['reason']);
             DB::table('assignments')->where('id', $assignment)->update(['place_id' => $place->id, 'tutor_id' => $place->tutor_id, 'updated_at' => now()]);
             Audit::record('asignacion.reasignada', ['id' => $assignment, 'anterior' => $row->place_id, 'nueva' => $place->id, 'motivo' => $data['reason']]);
         });

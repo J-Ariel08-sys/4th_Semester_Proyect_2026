@@ -13,8 +13,8 @@ public class Optimization {
     public record Assignment(String internoId, String plazaId, Integer preferencia) {}
     public record Pending(String internoId, String motivo) {}
     public record Result(String estado, boolean requiereAprobacion, long hardScore, long mediumScore, long softScore,
-                         List<Assignment> asignaciones, List<Pending> pendientes, Map<String, Integer> ocupacion,
-                         int capacidadUtilizable, int primerasPreferencias) {}
+                        List<Assignment> asignaciones, List<Pending> pendientes, Map<String, Integer> ocupacion,
+                        int capacidadUtilizable, int primerasPreferencias) {}
     public static void validate(Request request) {
         require(request != null, "Se requiere un cuerpo JSON.");
         require(request.plazas() != null && request.plazas().size() <= 500, "plazas: lista requerida, máximo 500.");

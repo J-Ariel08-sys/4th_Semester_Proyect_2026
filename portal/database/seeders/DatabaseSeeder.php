@@ -21,12 +21,19 @@ class DatabaseSeeder extends Seeder
             return;
         }
         DB::transaction(function () {
-            $password = Hash::make('SiclinDemo2026!');
+            $accounts = [];
+            $testPassword = app()->environment('testing') ? 'SiclinDemo2026!' : null;
             $users = [];
             foreach ([['Admin Demo', 'admin', 'administrador'], ['Coordinación Demo', 'coordinador', 'coordinador'], ['Dra. Lucía Demo', 'tutor', 'tutor'], ['Dr. Mateo Demo', 'tutor2', 'tutor'], ['Ana Demo', 'interno', 'interno'], ['Diego Demo', 'interno2', 'interno'], ['Valeria Demo', 'interno3', 'interno']] as $i => $row) {
+                $plainPassword = $testPassword ?? \Illuminate\Support\Str::password(24);
+                $accounts[] = ['email' => $row[1].'@siclin.test', 'password' => $plainPassword, 'role' => $row[2]];
                 $user = new User;
-                $user->forceFill(['name' => $row[0], 'email' => $row[1].'@siclin.test', 'password' => $password, 'role' => $row[2], 'active' => true, 'eligible' => $row[2] === 'interno', 'academic_average' => 90 - $i, 'merit' => 90 - $i, 'matricula' => $row[2] === 'interno' ? 'DEMO-'.$i : null])->save();
+                $user->forceFill(['name' => $row[0], 'email' => $row[1].'@siclin.test', 'password' => $plainPassword, 'activated_at' => now(), 'role' => $row[2], 'active' => true, 'eligible' => $row[2] === 'interno', 'academic_average' => 90 - $i, 'merit' => 90 - $i, 'matricula' => $row[2] === 'interno' ? 'DEMO-'.$i : null])->save();
                 $users[$row[1]] = $user->id;
+            }
+            if (! app()->environment('testing')) {
+                \Illuminate\Support\Facades\Storage::disk('local')->put('demo-accounts.json', json_encode($accounts, JSON_PRETTY_PRINT));
+                chmod(\Illuminate\Support\Facades\Storage::disk('local')->path('demo-accounts.json'), 0600);
             }
             foreach (['Medicina Interna', 'Cirugía', 'Pediatría', 'Ginecología y Obstetricia', 'Salud Pública'] as $name) {
                 DB::table('specialties')->insert(['name' => $name, 'created_at' => now(), 'updated_at' => now()]);

@@ -34,11 +34,11 @@ El portal lleva a cero los cupos utilizables de hospitales inactivos, convenios 
 
 ### Objetivo jerárquico
 
-Timefold utiliza `HardMediumSoftLongScore`:
+El motor PHP `RotationOptimizer` implementa una optimización lexicográfica estricta:
 
-1. **Hard**: cero violaciones de capacidad y habilitación.
-2. **Medium**: minimizar internos habilitados pendientes.
-3. **Soft**: preferencias, prioridad académica, equilibrio y conservación de asignaciones.
+1. **Hard**: cero violaciones de capacidad, reservas y habilitación (prioridad absoluta).
+2. **Medium**: minimizar internos habilitados pendientes (máxima cobertura factible).
+3. **Soft**: preferencias, prioridad académica (mérito), equilibrio de ocupación y conservación de asignaciones.
 
 La cobertura precede a los objetivos blandos: no se deja un cupo sin cubrir solo para mejorar una preferencia. Ante escasez se devuelven pendientes; nunca se presentan sobrecupos como solución válida. El portal exige resolver todos los pendientes antes de publicar la convocatoria completa.
 
@@ -70,11 +70,11 @@ La penalización convexa de ocupación favorece distribuir la carga de acuerdo c
 
 Las reservas son restricciones de capacidad en las tres políticas; A3 no las crea automáticamente. Configúralas en Gestión académica → Cupos.
 
-Timefold busca buenas soluciones en un tiempo acotado. Un puntaje duro cero acredita factibilidad respecto a las restricciones implementadas; no certifica óptimo global. Los resultados pueden variar entre ejecuciones por terminación temporal, aun con semilla fija. Se guardan entrada, resultado, hash y política para auditar cada ejecución.
+El motor PHP busca soluciones mediante flujo de costo mínimo con caminos aumentantes en red residual. Un puntaje duro cero acredita factibilidad respecto a las restricciones implementadas. Se guardan entrada, resultado, hash y política para auditar cada ejecución.
 
 ## 3. Decisión bajo incertidumbre
 
-La matriz `U_as` contiene utilidades comparables: mayor es mejor. No se aplican estos criterios directamente a capacidades ni a puntajes Timefold de políticas con pesos diferentes.
+La matriz `U_as` contiene utilidades comparables: mayor es mejor. No se aplican estos criterios directamente a capacidades ni a puntuaciones internas de políticas con pesos diferentes.
 
 | Alternativa | E1 | E2 | E3 |
 |---|---:|---:|---:|
@@ -139,7 +139,7 @@ Se exige:
 - Frente a un calendario ya aprobado se respeta el mayor descanso entre ambos calendarios.
 - Los turnos sin cobertura permanecen pendientes y bloquean la aprobación del lote.
 
-Laravel filtra tutores incompatibles con disponibilidad y calendarios ya publicados. Timefold en `POST /api/guardias` busca primero cero conflictos, luego máxima cobertura, y finalmente minimiza `Σ_t carga_minutos_t²`. La carga previa se cuenta sobre las semanas abarcadas por el calendario propuesto. Penalizar cuadrados favorece repartir horas entre tutores con distinta carga.
+Laravel filtra tutores incompatibles con disponibilidad y calendarios ya publicados. El motor PHP `ShiftOptimizer` busca primero cero conflictos, luego máxima cobertura mediante búsqueda acotada con poda por ordenación de candidatos, y finalmente minimiza la carga cuadrática `Σ_t carga_minutos_t² / disponibilidad_t`. La carga previa se cuenta sobre las semanas abarcadas por el calendario propuesto. Penalizar cuadrados favorece repartir horas entre tutores con distinta carga.
 
 La validación final de Laravel vuelve a comprobar el calendario elegido, sin recalcular otra solución: una propuesta factible no se rechaza simplemente porque otra ejecución del buscador elija tutores distintos. El módulo 7 planifica y aprueba; el módulo 4 y la acción de cumplimiento registran lo realizado. La confirmación de cumplimiento solo se admite después del fin del turno.
 
@@ -149,4 +149,4 @@ Demostrar con los mismos datos: una política elegida mediante criterios explíc
 
 No se implementa predicción clínica del abandono ni se interpreta una baja médica como indicador automatizado de riesgo. Asistencia e incidencias son registros descriptivos para revisión humana.
 
-Referencias de implementación: [modelo de planificación de Timefold](https://docs.timefold.ai/timefold-solver/1.x/using-timefold-solver/modeling-planning-problems), [guía oficial del solver](https://docs.timefold.ai/timefold-solver/1.x/quickstart/hello-world/hello-world-quickstart).
+Referencias de formulación: [modelo IO en PHP](MODELO_IO.md) y [contrato interno](CONTRATO_API.md).

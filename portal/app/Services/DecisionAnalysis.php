@@ -7,36 +7,39 @@ use Illuminate\Validation\ValidationException;
 class DecisionAnalysis
 {
     public const POLICIES = [
-        'A1' => ['pesoPreferencias' => 10, 'pesoMerito' => 1, 'pesoEquilibrio' => 0, 'pesoCambios' => 5],
-        'A2' => ['pesoPreferencias' => 1, 'pesoMerito' => 10, 'pesoEquilibrio' => 0, 'pesoCambios' => 5],
-        'A3' => ['pesoPreferencias' => 5, 'pesoMerito' => 3, 'pesoEquilibrio' => 3, 'pesoCambios' => 5],
+        'A1' => ['pesoPreferencias' => 10, 'pesoMerito' => 8, 'pesoEquilibrio' => 0, 'pesoCambios' => 5],
+        'A2' => ['pesoPreferencias' => 2, 'pesoMerito' => 2, 'pesoEquilibrio' => 10, 'pesoCambios' => 5],
+        'A3' => ['pesoPreferencias' => 5, 'pesoMerito' => 3, 'pesoEquilibrio' => 8, 'pesoCambios' => 5],
     ];
 
-    /** Utilities must share one scale and direction: higher is better. Alpha is optimism. */
-    public function calculate(array $matrix, float $alpha): array
+    /** Costs are converted to utility by u = -cost, without rescaling. Alpha is optimism. */
+    public function calculate(array $matrix, float $alpha, string $orientation = 'benefits'): array
     {
-        if (array_keys($matrix) !== array_keys(self::POLICIES) || $alpha < 0 || $alpha > 1) {
-            throw ValidationException::withMessages(['matrix' => 'Se requieren A1, A2 y A3; alfa entre 0 y 1.']);
+        if (! $matrix || count($matrix) > 50 || ! is_finite($alpha) || $alpha < 0 || $alpha > 1 || ! in_array($orientation, ['benefits', 'costs'], true)) {
+            throw ValidationException::withMessages(['matrix' => 'Matriz no vacía (máximo 50 alternativas), orientación beneficios/costos y alfa finito entre 0 y 1.']);
         }
-        foreach ($matrix as $row) {
-            if (count($row) !== 3) {
-                throw ValidationException::withMessages(['matrix' => 'Cada alternativa requiere E1, E2 y E3.']);
+        $scenarios = null;
+        foreach ($matrix as $name => $row) {
+            if (! is_string($name) || trim($name) === '' || strlen($name) > 100 || ! is_array($row) || count($row) < 1 || count($row) > 50 || ($scenarios !== null && array_keys($row) !== $scenarios)) {
+                throw ValidationException::withMessages(['matrix' => 'Identifica alternativas y usa las mismas columnas de escenarios en cada fila (1 a 50).']);
             }
+            $scenarios = array_keys($row);
             foreach ($row as $value) {
                 if (! is_numeric($value) || ! is_finite((float) $value) || abs((float) $value) > 1000000) {
-                    throw ValidationException::withMessages(['matrix' => 'Utilidades numéricas finitas, entre -1000000 y 1000000.']);
+                    throw ValidationException::withMessages(['matrix' => 'Valores finitos entre -1000000 y 1000000.']);
                 }
             }
         }
-        $best = [];
-        for ($j = 0; $j < 3; $j++) {
-            $best[$j] = max(array_column($matrix, $j));
-        }
-        $scores = [];
-        $regrets = [];
+        $utility = [];
         foreach ($matrix as $name => $row) {
-            $regrets[$name] = array_map(fn ($v, $j) => $best[$j] - $v, $row, array_keys($row));
-            $scores[$name] = ['maximin' => min($row), 'maximax' => max($row), 'laplace' => array_sum($row) / 3, 'hurwicz' => $alpha * max($row) + (1 - $alpha) * min($row), 'savage' => max($regrets[$name])];
+            $utility[$name] = array_map(fn ($value) => (float) $value * ($orientation === 'costs' ? -1 : 1), $row);
+        }
+        $best = [];
+        foreach ($scenarios as $scenario) { $best[$scenario] = max(array_column($utility, $scenario)); }
+        $scores = []; $regrets = [];
+        foreach ($utility as $name => $row) {
+            foreach ($row as $scenario => $value) { $regrets[$name][$scenario] = $best[$scenario] - $value; }
+            $scores[$name] = ['maximin' => min($row), 'maximax' => max($row), 'laplace' => array_sum($row) / count($row), 'hurwicz' => $alpha * max($row) + (1 - $alpha) * min($row), 'savage' => max($regrets[$name])];
         }
         $winners = [];
         foreach (array_keys(reset($scores)) as $criterion) {
@@ -46,15 +49,11 @@ class DecisionAnalysis
         }
         $sensitivity = [];
         for ($k = 0; $k <= 10; $k++) {
-            $a = $k / 10;
-            $values = [];
-            foreach ($matrix as $name => $row) {
-                $values[$name] = $a * max($row) + (1 - $a) * min($row);
-            }
-            $max = max($values);
-            $sensitivity[] = ['alpha' => $a, 'alternativas' => array_keys(array_filter($values, fn ($v) => abs($v - $max) < 1e-8))];
+            $a = $k / 10; $values = [];
+            foreach ($utility as $name => $row) { $values[$name] = $a * max($row) + (1 - $a) * min($row); }
+            $target = max($values);
+            $sensitivity[] = ['alpha' => $a, 'alternativas' => array_keys(array_filter($values, fn ($value) => abs($value - $target) < 1e-8)), 'values' => $values];
         }
-
-        return ['scores' => $scores, 'regrets' => $regrets, 'winners' => $winners, 'sensitivity' => $sensitivity];
+        return ['orientation' => $orientation, 'conversion' => $orientation === 'costs' ? 'utilidad = −costo (sin reescalado)' : 'utilidad = beneficio', 'scenarios' => $scenarios, 'utility' => $utility, 'scores' => $scores, 'regrets' => $regrets, 'winners' => $winners, 'sensitivity' => $sensitivity];
     }
 }
