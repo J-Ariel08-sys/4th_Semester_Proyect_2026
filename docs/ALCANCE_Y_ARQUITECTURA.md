@@ -42,7 +42,7 @@ flowchart LR
 
 | Grupo | Tablas principales |
 |---|---|
-| Seguridad | `users`, `sessions`, `password_reset_tokens`, `audit_logs`, `notifications` |
+| Seguridad | `users`, `sessions`, `otp_challenges`, `otp_limits`, `audit_logs`, `notifications` |
 | Académico/hospitalario | `hospitals`, `specialties`, `cycles`, `places` |
 | Postulación/asignación | `applications`, `optimization_runs`, `assignments` |
 | Seguimiento | `clinical_records`, `incidents`, `swap_requests` |
@@ -50,13 +50,9 @@ flowchart LR
 | Guardias | `availabilities`, `shift_batches`, `shifts` |
 | Documentos | `reports` y archivos en almacenamiento privado Laravel |
 
-## API de cálculo
+## Servicios de cálculo
 
-- `POST /api/optimizar`: plazas con capacidad/reserva, internos con habilitación, prioridad, preferencias, asignación anterior y pesos. Devuelve asignaciones, pendientes, ocupación, primeras preferencias y score.
-- `POST /api/guardias`: turnos fijos, candidatos compatibles por turno, carga previa y descanso. Devuelve tutor por turno o pendiente y score.
-- `GET /health`: salud de Quarkus.
-
-Los endpoints de cálculo están orientados al uso interno entre servicios. Compose publica su puerto solo en loopback para pruebas. Una instalación remota debe proteger la red interna y autenticar comunicaciones según el despliegue elegido.
+El backend Laravel ejecuta `RotationOptimizer`, `ShiftOptimizer` y `DecisionAnalysis` dentro de PHP. Las peticiones del portal encolan jobs y los workers guardan resultados en PostgreSQL. No existe un servicio Quarkus activo ni se publica el puerto 8081. Consulta [CONTRATO_API.md](CONTRATO_API.md) para las rutas HTTP actuales.
 
 ## Estados principales
 
@@ -99,17 +95,8 @@ La recuperación y publicación generan correos capturados por Mailpit en el ent
 - [Autenticación de Laravel](https://laravel.com/framework/docs/13.x/authentication).
 - [Recuperación de contraseñas](https://laravel.com/framework/docs/passwords).
 - [Pruebas HTTP](https://laravel.com/framework/docs/http-tests).
-- [Modelo de Timefold](https://docs.timefold.ai/timefold-solver/1.x/using-timefold-solver/modeling-planning-problems).
 - [Mailpit en Docker](https://mailpit.axllent.org/docs/install/docker/).
 
-## Evidencia de validación en desarrollo
+## Evidencia de validación
 
-Validado el 16 de noviembre de 2026 en este entorno:
-
-- 40 pruebas en PHPUnit ejecutadas contra PostgreSQL real (`siclin_test`) con 469 aserciones y 0 fallos.
-- 4 pruebas de navegador de punta a punta con Playwright y Chromium (100% pasando).
-- Ejemplo de escala de 180 internos / 45 grupos de cupos: resuelto en ~210 ms con 180 asignados y 0 violaciones duras.
-- Acceso HTTP real al portal (http://localhost:8000) y Mailpit (http://localhost:8025) con contenedores Docker healthy.
-- Comprobación de OTP por SMTP real capturado en Mailpit e invalidación de sesiones previas tras recuperación.
-- Verificación visual y funcional de roles (administrador, coordinador, tutor, interno) en anchos responsive de 320, 390, 768 y 1280 px.
-- PDF y QR criptográfico comprobados; privacidad de actas consolidadas y comprobantes individuales garantizada por Gates.
+Consulta [PRUEBAS.md](PRUEBAS.md) para los resultados de la revisión actual y [GUIA_DEMOS.md](GUIA_DEMOS.md) para reproducir los recorridos por rol. Los requisitos institucionales aún pendientes se detallan en [ESTADO_IMPLEMENTACION.md](ESTADO_IMPLEMENTACION.md).

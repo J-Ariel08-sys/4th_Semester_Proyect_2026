@@ -7,7 +7,7 @@
 cat .local/demo-accounts.json
 ```
 
-Abre http://localhost:8000. Usa `admin@siclin.test` y su contraseña **generada localmente** en ese archivo. No existe una contraseña demo compartida en el README ni se restablecen cuentas existentes al reiniciar.
+Abre http://localhost:8000. Las cuentas demo preparadas (`admin@siclin.test`, `coordinador@siclin.test`, `tutor@siclin.test`, `tutor2@siclin.test`, `interno@siclin.test`, `interno2@siclin.test` e `interno3@siclin.test`) comparten la contraseña **`SiclinDemo2026!`**. El archivo local permite confirmar las cuentas creadas. Al ejecutar de nuevo `./scripts/dev-up.sh`, se restablecen las credenciales de esas cuentas demo sin borrar los demás datos locales.
 
 ## 2. Agregar tu correo institucional
 

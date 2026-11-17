@@ -4,6 +4,7 @@ x-e2e-app: &e2e-app
   environment:
     APP_ENV: local
     APP_URL: http://localhost:8001
+    SESSION_COOKIE: siclin_e2e_session
     DB_HOST: postgres-db
     DB_DATABASE: siclin_e2e_test
     DB_USERNAME: siclin_e2e

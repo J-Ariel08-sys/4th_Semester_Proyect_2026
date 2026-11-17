@@ -13,7 +13,7 @@ if not path.exists():
     for key in ('APP_KEY', 'DB_PASSWORD', 'DB_DATABASE', 'DB_USERNAME'):
         if old.get(key): values[key] = old[key]
 values.update(existing)
-for key in ('APP_KEY', 'OTP_SECRET', 'DB_PASSWORD'):
+for key in ('APP_KEY', 'OTP_SECRET', 'DB_PASSWORD', 'DEMO_DB_PASSWORD'):
     if not values.get(key):
         values[key] = 'base64:' + base64.b64encode(secrets.token_bytes(32)).decode() if key == 'APP_KEY' else secrets.token_hex(32)
 path.touch(mode=0o600, exist_ok=True)

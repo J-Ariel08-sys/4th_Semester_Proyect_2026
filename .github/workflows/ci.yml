@@ -19,6 +19,13 @@ jobs:
         run: ./scripts/test.sh
       - name: Navegador, OTP SMTP local y permisos
         run: ./scripts/e2e.sh
+      - name: Preparar demostración por roles
+        run: ./scripts/demo-up.sh
+      - name: Recorrido de escenarios, guardias y seguimiento
+        env:
+          SICLIN_DEMO_TEST: '1'
+          SICLIN_E2E_URL: http://localhost:8010
+        run: node tests/browser/node_modules/playwright/cli.js test --config tests/browser/playwright.config.js
       - name: Diagnóstico de infraestructura
         run: ./scripts/diagnose.sh
       - name: Estado final de contenedores

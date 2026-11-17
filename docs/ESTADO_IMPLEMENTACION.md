@@ -1,25 +1,40 @@
-# Estado de implementación SICLIN
+# Estado de SICLIN
 
-Especificación: `PROMPT_CODEX_SICLIN_COMPLETO.txt`, verificada completamente el 16 de noviembre de 2026. Backend unificado en PHP/Laravel 13 con motores de optimización deterministas (`RotationOptimizer` y `ShiftOptimizer`). Se conserva `optimizer-quarkus/` como código histórico fuera del arranque.
+Revisión del 17 de noviembre de 2026. El backend activo utiliza Laravel/PHP; Quarkus se conserva únicamente como código histórico. La implementación se revisó sobre el commit `e930b8b` y se mantuvieron los servicios existentes.
 
-## Diagnóstico y estado
+## Cambios de esta revisión
 
-- Todos los servicios levantados y saludables en Docker: `web` (Nginx), `app` (PHP-FPM), `postgres-db` (PostgreSQL 16), `mailpit` (Mailpit 1.27), `queue-mail`, `queue-optimization` y `scheduler`.
-- 40 pruebas en PHPUnit ejecutadas contra PostgreSQL real (`siclin_test`), con 469 aserciones y 0 fallos.
-- 4 pruebas de navegador completas en Playwright ejecutadas contra entorno aislado (`siclin_e2e_test`), con 0 fallos.
-- Benchmark de escala (180 internos, 45 grupos de cupos): ~212 ms en motor PHP con 100 % de cobertura factible.
+- Navegación sin enlaces repetidos, sección activa correcta y panel inicial con tres tareas según el rol.
+- Estilo más sobrio, formulario de acceso compacto y corrección de desbordamiento en móviles.
+- Instancia de presentación separada (8010/8030), cuentas con contraseñas aleatorias y guía contextual por rol.
+- Dos postulaciones de ejemplo más Ana disponible para postular; Camila preparada para seguimiento clínico.
+- Arranque de demo que conserva avances y reinicio explícito protegido, con dump previo de la base de demo.
+- Corregido un error de compilación de la vista de rotes (`@endif` adyacentes), oculto en entornos con caché antigua. Las vistas compiladas dejaron de persistir junto a los datos; los tests recompilan las fuentes.
+- Documentación corregida: comandos Docker vigentes, credenciales generadas, arquitectura PHP y guion de Investigación Operativa.
 
-## Lista verificable
+## Funciones implementadas
 
-- [x] **Arranque Docker limpio, migración controlada, salud y persistencia:** Multi-stage build optimizado, migración atómica secuencial, healthchecks independientes y persistencia en volúmenes Docker.
-- [x] **M1: OTP, activación, cuentas, sesiones, permisos y auditoría:** OTP de 6 dígitos con HMAC y grant temporal en sesión, políticas de reintento/bloqueo, recuperación de contraseña, revocación de sesiones, bitácora de auditoría y protección de administradores.
-- [x] **M2: Oferta, habilitación, periodos, importación con vista previa:** Validación estricta de cupos/reservas, convenios hospitalarios vigentes, cohortes y requisitos académicos, importación CSV atómica con previsualización.
-- [x] **M3: Cálculo real en cola, estados, validación independiente y publicación:** Motor PHP de flujo de costo mínimo (`RotationOptimizer`), encolado en worker dedicado, estados técnicos y de plan desacoplados, comprobante QR inmutable, reoptimización con penalización de cambios.
-- [x] **M4: Permutas, incidencias, asistencia y rúbricas:** Permutas con doble consentimiento de internos y aprobación de Coordinación, registro diario de asistencia, rúbrica de cuatro competencias ponderadas al 100%, incidencias auditadas.
-- [x] **M5: Documentos por versión, PDF/QR y CSV con alcance autorizado:** Generación de actas y libretas en PDF privado con huella SHA-256, verificación pública por QR/token sin exponer nóminas completas, exportación CSV restringida por rol.
-- [x] **M6: Matrices rectangulares, costos, escenarios y sensibilidad:** Análisis de decisiones bajo incertidumbre (`DecisionAnalysis`) con 5 criterios (Maximin, Maximax, Laplace, Hurwicz con barrido de $\alpha$, Savage con matriz de arrepentimiento), soporte de costos y beneficios, simulación de 9 combinaciones de capacidad.
-- [x] **M7: Disponibilidad, planificación y publicación de guardias:** Motor determinista acotado con poda (`ShiftOptimizer`), disponibilidad horaria de tutores, no cruces, descanso configurable (0–48 h), cumplimiento retrospectivo.
-- [x] **PostgreSQL + Playwright/Mailpit, fallos y recuperación:** Verificación de entrega real de correos OTP en Mailpit local por SMTP, invalidación de sesiones previas, concurrencia en permisos de cambio.
-- [x] **Guías de operación, SMTP, respaldo y CI:** Scripts automatizados (`dev-up.sh`, `test.sh`, `e2e.sh`, `diagnose.sh`, `backup.sh`), configuración para transición a SMTP externo documentada, pipeline de CI en GitHub Actions.
+| Módulo | Comportamiento disponible |
+|---|---|
+| M1 · Acceso y seguridad | Cuatro roles, cuentas/activación, OTP por correo, recuperación y revocación de sesiones, auditoría |
+| M2 · Gestión académica | Hospitales, convenios, especialidades, periodos, cupos/reservas, internos, tutores, cohortes/requisitos, importación CSV con vista previa |
+| M3 · Postulación y rotes | Preferencias, comprobante privado, motor PHP en cola, revisión/aprobación/publicación, validación de versión, reoptimización |
+| M4 · Seguimiento | Asistencia, rúbrica, incidencias/resolución, permutas consensuadas, reasignación previa al inicio |
+| M5 · Documentos | Actas y libreta PDF, QR de verificación, integridad SHA-256, CSV limitado al ámbito del usuario |
+| M6 · Escenarios | Matrices de beneficios/costos, cinco criterios, empates, sensibilidad de α, simulación de nueve combinaciones y elección justificada |
+| M7 · Guardias | Disponibilidad, cálculo de tutores, cruces/descanso, aprobación y registro de cumplimiento |
 
-La recepción externa de correo requiere credenciales SMTP de producción (`MAIL_MODE=external`); el entorno local usa Mailpit para captura segura de desarrollo.
+La disponibilidad de estas funciones no equivale a validación institucional completa. La evidencia reproducible de las pruebas se mantiene en [PRUEBAS.md](PRUEBAS.md).
+
+## Pendientes externos y límites
+
+- **Correo institucional externo:** requiere credenciales SMTP y comprobar recepción en la bandeja real. SMTP local con Mailpit sí está cubierto por pruebas de navegador.
+- **Validación académica:** convenios, cupos, pesos de mérito, rúbrica, descansos y utilidad de escenarios necesitan aprobación y datos reales.
+- **Planificación anual:** el motor resuelve rotes por convocatoria/bloque y comprueba compatibilidad con lo publicado; no optimiza simultáneamente todo el año.
+- **Guardias:** asigna tutores a fechas e internos introducidos por Coordinación. No genera fechas ni aplica un límite semanal institucional que no fue especificado.
+- **Cambios durante un rote iniciado:** se documentan como incidencias; falta modelar segmentos/vigencias para una reasignación durante el periodo conservando su trayectoria.
+- **Documentos oficiales:** PDF/QR verifican registros internos; no son firma digital certificada ni integración con SEDES.
+- **Producción:** faltan despliegue HTTPS, operación y validación de carga con usuarios/datos reales. El Compose entregado es local.
+- **CI remoto:** el workflow está configurado; ejecutarlo en GitHub depende de publicar estos cambios y del entorno del repositorio. No se afirma una ejecución remota desde esta sesión.
+
+Para presentar: [GUIA_DEMOS.md](GUIA_DEMOS.md). Para explicar el modelo: [EXPOSICION_IO.md](EXPOSICION_IO.md).

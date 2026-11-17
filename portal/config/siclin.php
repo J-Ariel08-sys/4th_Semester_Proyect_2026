@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'demo' => (bool) env('SICLIN_DEMO', false),
     'solver_seconds' => (int) env('OPTIMIZER_SECONDS', 10),
     'shift_search_nodes' => (int) env('SHIFT_SEARCH_NODES', 100000),
     'otp_secret' => env('OTP_SECRET'),

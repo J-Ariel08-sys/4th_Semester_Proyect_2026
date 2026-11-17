@@ -17,11 +17,12 @@ COPY composer.json composer.lock ./
 RUN composer install --no-interaction --prefer-dist --no-scripts --no-autoloader
 
 FROM dependencies AS app
+ENV VIEW_COMPILED_PATH=/tmp/siclin-views
 COPY --chown=www-data:www-data . .
 COPY --from=assets --chown=www-data:www-data /app/public/build public/build
 RUN composer dump-autoload --optimize --no-interaction \
-    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/app/private \
-    && chown -R www-data:www-data storage bootstrap/cache \
+    && mkdir -p /tmp/siclin-views storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs storage/app/private \
+    && chown -R www-data:www-data /tmp/siclin-views storage bootstrap/cache \
     && printf 'memory_limit=512M\nexpose_php=Off\n' > /usr/local/etc/php/conf.d/siclin.ini
 USER www-data
 EXPOSE 9000

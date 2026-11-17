@@ -19,9 +19,13 @@ Laravel 13.42.0 (Composer lock), PHP 8.5 (imagen fijada por digest), PostgreSQL 
 
 ## Configuración
 
+La presentación utiliza `docker-compose.demo.yml`, proyecto `siclin-demo`, base/usuario `siclin_demo`, volúmenes propios, portal 8010 y Mailpit 8030. La cookie `siclin_demo_session` evita colisiones con las sesiones de trabajo en localhost. El correo se fuerza a Mailpit. `siclin:demo --reset` comprueba entorno local, bandera de demo, controlador PostgreSQL y nombre de base/usuario antes de admitir un reinicio. `scripts/demo-up.sh --reset` guarda primero una copia de esa base. Las pruebas de navegador usan otro proyecto y cookie (`siclin-e2e` / `siclin_e2e_session`).
+
 Docker consume **`.env` de la raíz** mediante Compose y `env_file`. `portal/.env` es exclusivamente para ejecución fuera de Docker: no se copia en imágenes. `scripts/init-env.py` crea secretos faltantes y conserva los existentes; importa APP_KEY y conexión del `.env` previo al primer arranque para no invalidar datos. No ejecutes `key:generate` en cada reinicio.
 
 APP_KEY cifra sesiones y payloads de correo. OTP_SECRET calcula verificadores HMAC. Guarda ambos fuera de Git y con las copias de seguridad. Cada servicio Laravel recibe los mismos valores. El build incorpora vendor y recursos; no hay un bind mount que los oculte. `portal_storage` conserva documentos y archivos privados.
+
+Las vistas Blade compiladas viven en `/tmp/siclin-views` dentro de cada contenedor, fuera del volumen persistente. Reconstruir y recrear el contenedor las regenera; no hereda plantillas compiladas de una versión anterior. Las pruebas usan otra carpeta por proceso y recompilan las vistas para comprobar el código fuente actual.
 
 ## Seguridad
 

@@ -9,6 +9,8 @@ use App\Services\RotationService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ClinicalDemoSeeder extends Seeder
 {
@@ -29,8 +31,10 @@ class ClinicalDemoSeeder extends Seeder
         }
         Auth::setUser($coordinator);
         DB::transaction(function () use ($coordinator, $tutor) {
-            if (User::where('email','interno.clinico@siclin.test')->exists()) { throw new \RuntimeException('La cuenta clínica ya existe; no se reemplazó.'); }
-            $plainPassword=\Illuminate\Support\Str::password(24);
+            if (User::where('email', 'interno.clinico@siclin.test')->exists()) {
+                throw new \RuntimeException('La cuenta clínica ya existe; no se reemplazó.');
+            }
+            $plainPassword = Str::password(24);
             $user = new User;
             $user->forceFill(['name' => 'Camila Clínica Demo', 'email' => 'interno.clinico@siclin.test', 'password' => $plainPassword, 'activated_at' => now(), 'role' => 'interno', 'eligible' => true, 'active' => true, 'academic_average' => 85, 'merit' => 85, 'matricula' => 'DEMO-CLINICA'])->save();
             $cycle = DB::table('cycles')->insertGetId(['name' => 'DEMO · Seguimiento clínico en curso', 'specialty_id' => DB::table('specialties')->where('name', 'Cirugía')->value('id'), 'starts_on' => now()->subDays(3)->toDateString(), 'ends_on' => now()->addDays(2)->toDateString(), 'opens_at' => now()->subDays(14), 'closes_at' => now()->subDays(8), 'status' => 'publicada', 'created_at' => now(), 'updated_at' => now()]);
@@ -46,11 +50,11 @@ class ClinicalDemoSeeder extends Seeder
             DB::table('availabilities')->insert(['tutor_id' => $tutor->id, 'starts_at' => now()->subDays(3)->startOfDay(), 'ends_at' => now()->addDays(2)->endOfDay(), 'created_at' => now(), 'updated_at' => now()]);
             $batch = DB::table('shift_batches')->insertGetId(['name' => 'DEMO · Guardia finalizada para registrar', 'rest_hours' => 12, 'status' => 'aprobada', 'created_by' => $coordinator->id, 'created_at' => now(), 'updated_at' => now()]);
             DB::table('shifts')->insert(['batch_id' => $batch, 'assignment_id' => $assignment, 'tutor_id' => $tutor->id, 'starts_at' => now()->subHours(10), 'ends_at' => now()->subHours(4), 'performed' => false, 'created_at' => now(), 'updated_at' => now()]);
-            $disk=\Illuminate\Support\Facades\Storage::disk('local');
-            $accounts=json_decode($disk->get('demo-accounts.json') ?? '[]',true);
-            $accounts[]=['email'=>$user->email,'password'=>$plainPassword,'role'=>'interno'];
-            $disk->put('demo-accounts.json',json_encode($accounts,JSON_PRETTY_PRINT));
-            chmod($disk->path('demo-accounts.json'),0600);
+            $disk = Storage::disk('local');
+            $accounts = json_decode($disk->exists('demo-accounts.json') ? $disk->get('demo-accounts.json') : '[]', true);
+            $accounts[] = ['email' => $user->email, 'password' => $plainPassword, 'role' => 'interno'];
+            $disk->put('demo-accounts.json', json_encode($accounts, JSON_PRETTY_PRINT));
+            chmod($disk->path('demo-accounts.json'), 0600);
             Audit::record('demo.clinica_cargada', ['convocatoria' => $cycle, 'nota' => 'Datos ficticios retrospectivos para pruebas; no son registros institucionales.']);
         });
         $this->command?->info('Ejemplo clínico creado. Interno: interno.clinico@siclin.test; tutor: tutor@siclin.test; clave privada en storage/app/private/demo-accounts.json');

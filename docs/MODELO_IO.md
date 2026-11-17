@@ -18,7 +18,7 @@ Prioridad lexicográfica: primero máxima cobertura; después máximo beneficio 
 
 Satisfacción s(i,p) = floor(100·(n − posición)/n) para una preferencia de posición cero a n−1; cero si no fue listada. Mérito m = round(0.7·promedio + 0.3·méritos).
 
-Beneficio = Σ x·[wP·s + floor(wM·s·m/100) − 100·wC·cambio] − wE·Σ floor(100·ocupación²/capacidad utilizable), aplicando equilibrio también a carga agregada del tutor. La implementación usa costos marginales convexos por unidad. El mérito multiplica satisfacción: no es la suma constante de promedios cuando todos reciben plaza.
+Beneficio = Σ x·[wP·s + floor(wM·s·m/100) − 100·wC·cambio] − Σp floor(wE·100·ocupación(p)²/capacidad utilizable(p)) − Σt floor(wE·100·carga(t)²/límite disponible(t)). La implementación usa costos marginales convexos por unidad. El mérito multiplica satisfacción: no es la suma constante de promedios cuando todos reciben plaza.
 
 | Política demo | Preferencia | Mérito | Equilibrio | Cambios |
 |---|---:|---:|---:|---:|
@@ -57,3 +57,5 @@ La simulación evalúa políticas con ajustes posteriores permitidos frente a tr
 ## Prueba de tamaño definido
 
 Fixture: 180 internos habilitados, una especialidad/bloque, 45 grupos con capacidad 5 y reserva 1: 180 cupos utilizables. Preferencias compatibles y repetibles. Mide un cálculo por bloque y validación de cobertura/capacidad; no simula cinco especialidades ni certifica un rendimiento institucional anual. Los tiempos observados figuran en PRUEBAS.md.
+
+Para presentar estos conceptos sin comenzar por las fórmulas, usa [EXPOSICION_IO.md](EXPOSICION_IO.md). Incluye un ejemplo de asignación calculable a mano y el guion para mostrar los tres motores en la interfaz.

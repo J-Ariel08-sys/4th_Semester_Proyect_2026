@@ -1,10 +1,39 @@
-<x-layout title="Inicio"><div class="page-heading"><div><p class="eyebrow">PANORAMA DEL INTERNADO</p><h1>Hola, {{ explode(' ',auth()->user()->name)[0] }}.</h1><p>Tu actividad académica, en un solo lugar.</p></div><span class="badge neutral">{{ now()->format('d/m/Y') }} · La Paz</span></div>
-<div class="stats">@foreach($stats as $label=>$count)<div class="stat"><small>{{ $label }}</small><strong>{{ $count }}</strong><span class="trend">Datos registrados en el sistema</span></div>@endforeach</div>
-<div class="hero-note"><p class="eyebrow" style="color:#9ad8ce">PLANIFICACIÓN CON PROPÓSITO</p><h2>{{ $manager?'De los cupos a una propuesta revisable.':'Cada rote, un paso en tu formación.' }}</h2><p>{{ $manager?'Configura la oferta, compara políticas y revisa cada asignación antes de publicarla.':'Consulta tus asignaciones, registra tus preferencias y mantén al día tu seguimiento clínico.' }}</p></div>
-<div class="grid-two"><section class="card"><div class="card-head"><h2>Convocatorias recientes</h2><a href="{{ route('rotations') }}">Ver todas →</a></div><div class="timeline">@forelse($cycles as $cycle)<div class="timeline-item"><span class="badge" style="float:right">{{ ucfirst($cycle->status) }}</span><strong>{{ $cycle->name }}</strong><p>{{ $cycle->starts_on }} — {{ $cycle->ends_on }}</p></div>@empty<div class="empty">Aún no hay convocatorias. Configura la primera en Gestión académica.</div>@endforelse</div></section><section class="card"><p class="eyebrow">FLUJO DE TRABAJO</p><h2>Un proceso con revisión humana</h2><div class="timeline"><div><strong>01 · Preparar</strong><p class="help">Convenios, cupos, habilitación y preferencias.</p></div><div><strong>02 · Comparar y calcular</strong><p class="help">Escenarios, política elegida y propuesta de asignación.</p></div><div><strong>03 · Aprobar y acompañar</strong><p class="help">Publicación, guardias, seguimiento y actas.</p></div></div></section></div>
-@if($notifications->isNotEmpty())<section class="card"><h2 id="notificaciones">Notificaciones</h2>@foreach($notifications as $notification)<div class="timeline-item"><strong>{{ $notification->data['title'] }}</strong><p>{{ $notification->data['message'] }}</p><a href="{{ $notification->data['url'] }}">Consultar</a>@if(!$notification->read_at)<form method="post" action="{{ route('notifications.read',$notification->id) }}" style="display:inline-block;margin-left:15px">@csrf<button class="button small subtle">Marcar leída</button></form>@endif</div>@endforeach</section>@endif
-<h2>Accesos a tus módulos</h2><div class="module-grid">
-@if($manager)<a class="module" href="{{ route('management','hospitales') }}"><span class="number">02 / GESTIÓN</span><h3>Base hospitalaria y académica</h3><p>Organiza convenios, especialidades, convocatorias y cupos.</p></a>@endif
-<a class="module" href="{{ route('rotations') }}"><span class="number">03 / ROTACIONES</span><h3>Postulación y asignación</h3><p>Consulta convocatorias y propuestas de rotes.</p></a><a class="module" href="{{ route('clinical') }}"><span class="number">04 / SEGUIMIENTO</span><h3>Actividad clínica</h3><p>Asistencia, evaluaciones e incidencias.</p></a><a class="module" href="{{ route('reports') }}"><span class="number">05 / DOCUMENTOS</span><h3>Libreta y actas</h3><p>Consulta tu historial y los reportes disponibles.</p></a>
-@if($manager)<a class="module" href="{{ route('scenarios') }}"><span class="number">06 / DECISIONES</span><h3>Explora escenarios</h3><p>Compara alternativas y registra la política elegida.</p></a>@endif
-<a class="module" href="{{ route('shifts') }}"><span class="number">07 / PLANIFICACIÓN</span><h3>Guardias y carga de tutores</h3><p>Disponibilidad, calendarios y cumplimiento.</p></a></div></x-layout>
+<x-layout title="Inicio">
+    <div class="page-heading">
+        <div><p class="eyebrow">{{ ucfirst(auth()->user()->role) }}</p><h1>Hola, {{ explode(' ', auth()->user()->name)[0] }}.</h1><p>Elige una tarea para continuar.</p></div>
+        <span class="badge neutral">{{ now()->format('d/m/Y') }} · La Paz</span>
+    </div>
+    <div class="module-grid">
+        @foreach($actions as [$label, $route, $description])
+            <a class="module" href="{{ route($route) }}"><h3>{{ $label }} →</h3><p>{{ $description }}</p></a>
+        @endforeach
+    </div>
+    <div class="stats">
+        @foreach($stats as $label => $count)<div class="stat"><small>{{ $label }}</small><strong>{{ $count }}</strong></div>@endforeach
+    </div>
+    <section class="card">
+        <div class="card-head"><h2>{{ $manager ? 'Asignaciones recientes' : 'Rotes en tu ámbito' }}</h2><a href="{{ route('clinical') }}">Ver seguimiento</a></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Interno</th><th>Especialidad</th><th>Hospital</th><th>Periodo</th></tr></thead>
+            <tbody>
+            @forelse($assignments->sortByDesc('id')->take(5) as $assignment)
+                <tr><td>{{ $assignment->intern }}</td><td>{{ $assignment->specialty }}</td><td>{{ $assignment->hospital }}</td><td>{{ $assignment->starts_on }} — {{ $assignment->ends_on }}</td></tr>
+            @empty
+                <tr><td colspan="4" class="empty">Las asignaciones aparecerán cuando Coordinación publique una propuesta.</td></tr>
+            @endforelse
+            </tbody>
+        </table></div>
+    </section>
+    <section class="card" id="notificaciones">
+        <h2>Notificaciones</h2>
+        @forelse($notifications as $notification)
+            <div class="timeline-item">
+                <strong>{{ $notification->data['title'] }}</strong><p>{{ $notification->data['message'] }}</p>
+                <div class="form-actions"><a href="{{ $notification->data['url'] }}">Consultar</a>
+                @if(!$notification->read_at)<form method="post" action="{{ route('notifications.read', $notification->id) }}">@csrf<button class="button small secondary">Marcar leída</button></form>@endif</div>
+            </div>
+        @empty
+            <p class="muted">No tienes avisos nuevos.</p>
+        @endforelse
+    </section>
+</x-layout>

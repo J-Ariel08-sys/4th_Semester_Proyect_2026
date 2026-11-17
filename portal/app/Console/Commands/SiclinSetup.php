@@ -19,13 +19,14 @@ class SiclinSetup extends Command
         }
         if (! config('app.key')) {
             $this->error('Configura APP_KEY con scripts/init-env.py antes de iniciar.');
+
             return self::FAILURE;
         }
         if ($this->call('migrate', ['--force' => true]) !== 0) {
             return self::FAILURE;
         }
-        if ($this->option('demo')) {
-            $this->call('db:seed', ['--force' => true]);
+        if ($this->option('demo') && $this->call('db:seed', ['--force' => true]) !== self::SUCCESS) {
+            return self::FAILURE;
         }
         $this->info('SICLIN preparado. Portal: '.config('app.url'));
 
