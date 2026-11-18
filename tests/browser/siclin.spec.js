@@ -44,7 +44,7 @@ test('activación y recuperación OTP por SMTP real de Mailpit, sesiones y consu
   const create = page.locator('form[action$="/gestion/usuarios"]');
   await create.locator('[name=name]').fill('Cuenta OTP de prueba');
   await create.locator('[name=email]').fill(account.email);
-  await create.locator('[name=role]').selectOption('interno');
+  await create.locator('[name=role]').selectOption('tutor');
   await create.getByRole('button', { name: 'Guardar registro' }).click();
   await expect(page.getByRole('status')).toContainText('guardado');
   await logout(page);
@@ -59,6 +59,13 @@ test('activación y recuperación OTP por SMTP real de Mailpit, sesiones y consu
   await page.locator('[name=password_confirmation]').fill(account.password);
   await page.getByRole('button', { name: 'Guardar contraseña' }).click();
   await expect(page).toHaveURL(/\/login$/);
+  await login(page, credentials('coordinador'));
+  await page.goto('/gestion/habilitaciones');
+  await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Completar datos' }).click();
+  await page.locator('[name=access_enabled][type=checkbox]').check();
+  await page.getByRole('button', { name: 'Guardar registro' }).click();
+  await expect(page.getByRole('status')).toContainText('guardado');
+  await logout(page);
   await login(page, account);
   const oldContext = await browser.newContext();
   const oldPage = await oldContext.newPage();
@@ -108,7 +115,7 @@ test('menús por rol y navegación responsive a 320, 390, 768 y 1280 px', async 
       } else await expect(page.getByText(menu,{exact:true}).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     }
-    if (user === 'admin') expect((await page.goto('/seguimiento')).status()).toBe(403);
+    if (user === 'admin') expect((await page.goto('/seguimiento')).status()).toBe(200);
     if (user === 'interno') expect((await page.goto('/gestion/usuarios')).status()).toBe(403);
     await context.close();
   }

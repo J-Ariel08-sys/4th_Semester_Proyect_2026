@@ -11,14 +11,14 @@ class RoleMiddleware
 {
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        if (! $request->user()?->active || ($request->session()->has('security_version') && $request->session()->get('security_version') !== $request->user()->security_version)) {
+        if (! $request->user()?->canSignIn() || ($request->session()->has('security_version') && $request->session()->get('security_version') !== $request->user()->security_version)) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
             return redirect()->route('login');
         }
-        abort_unless(in_array($request->user()->role, $roles, true), 403, 'Tu rol no tiene permiso para esta acción.');
+        abort_unless($request->user()->isAdministrator() || in_array($request->user()->role, $roles, true), 403, 'Tu rol no tiene permiso para esta acción.');
 
         return $next($request);
     }

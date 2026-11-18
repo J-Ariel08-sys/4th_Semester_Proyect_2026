@@ -11,9 +11,9 @@ class PortalController extends Controller
     public function index(): View
     {
         if (auth()->user()->role === 'administrador') {
-            return view('admin-dashboard', ['users' => DB::table('users')->count(), 'pending' => DB::table('users')->whereNull('activated_at')->count(), 'failed' => DB::table('audit_logs')->where('action', 'sesion.fallida')->where('created_at', '>=', now()->subDay())->count()]);
+            return view('admin-dashboard', ['users' => DB::table('users')->whereNull('deleted_at')->count(), 'pending' => DB::table('users')->whereNull('deleted_at')->whereNull('activated_at')->count(), 'approvalPending' => DB::table('users')->whereNull('deleted_at')->where('role', '!=', 'administrador')->whereNull('access_approved_at')->count(), 'failed' => DB::table('audit_logs')->where('action', 'sesion.fallida')->where('created_at', '>=', now()->subDay())->count()]);
         }
-        $manager = (auth()->user()->role === 'coordinador');
+        $manager = (auth()->user()->managesAcademics());
         $assignments = ClinicalController::assignments()->get();
         $stats = [
             'Rotes asignados' => $assignments->count(),

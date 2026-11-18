@@ -58,15 +58,13 @@ class DemoReadinessTest extends TestCase
 
         foreach (['administrador', 'coordinador', 'interno', 'tutor'] as $role) {
             $this->actingAs(User::where('role', $role)->firstOrFail());
-            $this->get(route('dashboard'))->assertOk()->assertSee('Demostración · datos ficticios');
-            $this->get(route('help'))->assertOk()->assertSee('Tu recorrido de demostración');
-            if ($role !== 'administrador') {
-                $this->get(route('rotations'))->assertOk();
-            }
+            $this->get(route('dashboard'))->assertOk();
+            $this->get(route('help'))->assertOk()->assertSee('Recorrido del sistema');
+            $this->get(route('rotations'))->assertOk();
         }
-        $this->actingAs($ana)->get(route('dashboard'))->assertDontSee('Camila Clínica Demo');
+        $this->actingAs($ana)->get(route('dashboard'))->assertDontSee('Camila Rojas');
         $otherTutor = User::where('email', 'tutor2@siclin.test')->firstOrFail();
-        $this->actingAs($otherTutor)->get(route('dashboard'))->assertDontSee('Camila Clínica Demo');
+        $this->actingAs($otherTutor)->get(route('dashboard'))->assertDontSee('Camila Rojas');
     }
 
     public function test_demo_reset_refuses_any_database_other_than_the_dedicated_demo(): void

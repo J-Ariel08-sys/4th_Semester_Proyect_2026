@@ -1,0 +1,140 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+const accounts = JSON.parse(fs.readFileSync(new URL('../../.local/e2e-accounts.json', import.meta.url)));
+const accountFor = name => accounts.find(a => a.email === `${name}@siclin.test`);
+async function login(page, account) {
+  await page.goto('/login');
+  await page.locator('[name=email]').fill(account.email);
+  await page.locator('[name=password]').fill(account.password);
+  await page.getByRole('button', { name: 'Ingresar al portal' }).click();
+  await expect(page).toHaveURL(/\/panel$/);
+}
+async function logout(page) {
+  await page.locator('form[action$="/salir"]').evaluate(form => form.submit());
+  await expect(page).toHaveURL(/\/login$/);
+}
+
+test('visibilidad de contraseña, tema persistente y navegación móvil en los cuatro roles', async ({ browser }) => {
+  test.setTimeout(120000);
+  for (const name of ['admin', 'coordinador', 'tutor', 'interno']) {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'light' });
+    const page = await context.newPage();
+    await page.goto('/login');
+    const password = page.locator('[name=password]');
+    await password.fill('PruebaVisual2026!');
+    await page.getByRole('button', { name: 'Mostrar contraseña', exact: true }).click();
+    await expect(password).toHaveAttribute('type', 'text');
+    await expect(password).toHaveValue('PruebaVisual2026!');
+    await page.getByRole('button', { name: 'Ocultar contraseña', exact: true }).click();
+    await expect(password).toHaveAttribute('type', 'password');
+    await page.getByRole('button', { name: 'Activar modo oscuro' }).click();
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await login(page, accountFor(name));
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const links = await page.locator('#navigation a').evaluateAll(nodes => [...new Set(nodes.map(n => n.href))]);
+    for (const url of links) {
+      const response = await page.goto(url);
+      expect(response.status(), url).toBe(200);
+      expect(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(17, 25, 31)');
+      for (const width of [320, 390, 768, 1280]) {
+        await page.setViewportSize({ width, height: 844 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name}: ${url}, ${width}px`).toBe(true);
+      }
+    }
+    await page.goto('/panel');
+    await page.setViewportSize({ width: 320, height: 844 });
+    const toggle = page.getByRole('button', { name: 'Menú de navegación' });
+    await toggle.click();
+    await expect(page.locator('#navigation')).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#navigation')).not.toBeVisible();
+    await page.getByRole('button', { name: 'Activar modo claro' }).click();
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await context.close();
+  }
+});
+
+test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar con bitácora', async ({ page, browser }) => {
+  test.setTimeout(90000);
+  page.on('dialog', dialog => dialog.accept());
+  const stamp = Date.now();
+  const account = { email: `habilitacion.${stamp}@siclin.test`, password: 'ClaveInicialDemo2026!' };
+  await login(page, accountFor('admin'));
+  await page.goto('/gestion/cohortes');
+  const cohort = page.locator('form[action$="/gestion/cohortes"]');
+  await cohort.locator('[name=name]').fill(`Cohorte de acceso ${stamp}`);
+  await cohort.locator('[name=entry_year]').fill('2026');
+  await cohort.getByRole('button', { name: 'Guardar registro' }).click();
+  await expect(page.getByRole('status')).toContainText('guardado');
+  await page.goto('/gestion/usuarios');
+  await expect(page.locator('main')).not.toContainText('Importar nómina');
+  const create = page.locator('form[action$="/gestion/usuarios"]');
+  await create.locator('[name=name]').fill('Interno de habilitación en navegador');
+  await create.locator('[name=email]').fill(account.email);
+  await create.locator('[name=role]').selectOption('interno');
+  await create.locator('[name=password]').fill(account.password);
+  await create.locator('[name=password_confirmation]').fill(account.password);
+  await create.getByRole('button', { name: 'Guardar registro' }).click();
+  await expect(page.getByRole('status')).toContainText('guardado');
+  await logout(page);
+  await page.locator('[name=email]').fill(account.email);
+  await page.locator('[name=password]').fill(account.password);
+  await page.getByRole('button', { name: 'Ingresar al portal' }).click();
+  await expect(page.getByRole('alert')).toContainText('Coordinación debe completar tu habilitación');
+  await login(page, accountFor('coordinador'));
+  await page.goto('/gestion/habilitaciones');
+  await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Completar datos' }).click();
+  await page.locator('[name=cohort_id]').selectOption({ label: `Cohorte de acceso ${stamp}` });
+  await page.locator('[name=matricula]').fill(`LP-${stamp}`);
+  await page.locator('[name=academic_average]').fill('88');
+  await page.locator('[name=merit]').fill('75');
+  await page.locator('[name=eligible][type=checkbox]').check();
+  await page.getByRole('button', { name: 'Guardar registro' }).click();
+  await expect(page.getByRole('status')).toContainText('guardado');
+  await logout(page);
+  await login(page, account);
+  await page.goto('/mi-cuenta');
+  await expect(page.locator('main')).toContainText('Habilitado');
+  expect((await page.request.get('/gestion/usuarios')).status()).toBe(403);
+  const oldContext = await browser.newContext();
+  const oldPage = await oldContext.newPage();
+  await login(oldPage, account);
+  await logout(page);
+  await login(page, accountFor('admin'));
+  await page.goto('/gestion/usuarios');
+  await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Editar', exact: true }).click();
+  const replacement = 'ClaveModificadaDemo2026!';
+  await page.locator('[name=password]').fill(replacement);
+  await page.locator('[name=password_confirmation]').fill(replacement);
+  await page.getByRole('button', { name: 'Guardar registro' }).click();
+  await expect(page.getByRole('status')).toContainText('guardado');
+  await oldPage.goto('/panel');
+  await expect(oldPage).toHaveURL(/\/login$/);
+  await oldContext.close();
+  await logout(page);
+  await page.locator('[name=email]').fill(account.email);
+  await page.locator('[name=password]').fill(account.password);
+  await page.getByRole('button', { name: 'Ingresar al portal' }).click();
+  await expect(page.getByRole('alert')).toContainText('Credenciales inválidas');
+  await login(page, { ...account, password: replacement });
+  await logout(page);
+  await login(page, accountFor('admin'));
+  await page.goto('/gestion/usuarios');
+  await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Editar', exact: true }).click();
+  await page.locator('[name=reason]').fill('Cuenta temporal retirada al terminar la prueba de navegador.');
+  await page.getByRole('button', { name: 'Eliminar registro', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Registro eliminado');
+  await expect(page.getByRole('row').filter({ hasText: account.email })).toHaveCount(0);
+  await page.goto('/bitacora');
+  const deletion = page.getByRole('row').filter({ hasText: 'gestion.eliminada' }).filter({ hasText: account.email });
+  await expect(deletion).toContainText('Cuenta temporal retirada');
+  await expect(page.locator('main')).not.toContainText(replacement);
+  await logout(page);
+  await page.locator('[name=email]').fill(account.email);
+  await page.locator('[name=password]').fill(replacement);
+  await page.getByRole('button', { name: 'Ingresar al portal' }).click();
+  await expect(page.getByRole('alert')).toContainText('Credenciales inválidas');
+});

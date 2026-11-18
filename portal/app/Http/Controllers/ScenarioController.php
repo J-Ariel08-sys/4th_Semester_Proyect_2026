@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ComputeScenario;
 use App\Services\Audit;
 use App\Services\DecisionAnalysis;
 use App\Services\RotationService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +18,16 @@ class ScenarioController extends Controller
 {
     public function index(): View
     {
-        return view('scenarios', ['tutors'=>DB::table('users')->where('role','tutor')->where('active',true)->get(), 'studies' => DB::table('scenario_studies')->orderByDesc('id')->paginate(10), 'cycles' => DB::table('cycles')->whereIn('status', ['cerrada', 'publicada'])->get()]);
+        return view('scenarios', ['tutors' => DB::table('users')->where('role', 'tutor')->where('active', true)->get(), 'studies' => DB::table('scenario_studies')->orderByDesc('id')->paginate(10), 'cycles' => DB::table('cycles')->whereNull('deleted_at')->whereIn('status', ['cerrada', 'publicada'])->get()]);
     }
 
     public function store(Request $request, DecisionAnalysis $analysis): RedirectResponse
     {
         $data = $request->validate(['name' => 'required|string|max:150', 'alpha' => 'required|numeric|between:0,1', 'orientation' => ['sometimes', Rule::in(['benefits', 'costs'])], 'matrix_json' => 'nullable|json|max:100000', 'matrix' => 'required_without:matrix_json|array|max:50', 'matrix.*' => 'required|array|min:1|max:50', 'matrix.*.*' => 'required|numeric|between:-1000000,1000000']);
         $matrix = ! empty($data['matrix_json']) ? json_decode($data['matrix_json'], true) : $data['matrix'];
-        if (! is_array($matrix)) { throw ValidationException::withMessages(['matrix' => 'Se requiere un objeto de alternativas y escenarios.']); }
+        if (! is_array($matrix)) {
+            throw ValidationException::withMessages(['matrix' => 'Se requiere un objeto de alternativas y escenarios.']);
+        }
         $result = $analysis->calculate($matrix, (float) $data['alpha'], $data['orientation'] ?? 'benefits');
         $result['source'] = 'Ejercicio ingresado por Coordinación; no es evidencia institucional.';
         DB::transaction(function () use ($data, $matrix, $result) {
@@ -50,28 +54,30 @@ class ScenarioController extends Controller
         return back()->with('status', 'Política aprobada y disponible para la optimización.');
     }
 
-    public function status(int $study): \Illuminate\Http\JsonResponse
+    public function status(int $study): JsonResponse
     {
-        $row=DB::table('scenario_studies')->find($study); abort_unless($row,404);
-        return response()->json(['execution_status'=>$row->execution_status,'plan_status'=>$row->chosen ? 'política elegida' : 'simulación','diagnostic'=>$row->diagnostic]);
+        $row = DB::table('scenario_studies')->find($study);
+        abort_unless($row, 404);
+
+        return response()->json(['execution_status' => $row->execution_status, 'plan_status' => $row->chosen ? 'política elegida' : 'simulación', 'diagnostic' => $row->diagnostic]);
     }
 
     public function simulate(Request $request, RotationService $optimizer, DecisionAnalysis $analysis): RedirectResponse
     {
-        $data = $request->validate(['cycle_id' => 'required|exists:cycles,id', 'name' => 'required|string|max:150', 'alpha' => 'required|numeric|between:0,1', 'factors' => 'sometimes|array|size:3', 'factors.*' => 'required|numeric|between:0,1', 'limits'=>'sometimes|array|size:3', 'limits.*'=>'required|numeric|between:0,1', 'unavailable'=>'sometimes|array|max:3','unavailable.*'=>'array|max:500','unavailable.*.*'=>'integer|exists:users,id']);
-        $cycle = DB::table('cycles')->find($data['cycle_id']);
-        abort_unless(in_array($cycle->status, ['cerrada','publicada']), 409);
+        $data = $request->validate(['cycle_id' => 'required|exists:cycles,id', 'name' => 'required|string|max:150', 'alpha' => 'required|numeric|between:0,1', 'factors' => 'sometimes|array|size:3', 'factors.*' => 'required|numeric|between:0,1', 'limits' => 'sometimes|array|size:3', 'limits.*' => 'required|numeric|between:0,1', 'unavailable' => 'sometimes|array|max:3', 'unavailable.*' => 'array|max:500', 'unavailable.*.*' => 'integer|exists:users,id']);
+        $cycle = DB::table('cycles')->whereNull('deleted_at')->find($data['cycle_id']);
+        abort_unless($cycle && in_array($cycle->status, ['cerrada', 'publicada']), 409);
         $base = $optimizer->input((int) $data['cycle_id'], DecisionAnalysis::POLICIES['A1']);
         if (! $base['internos']) {
             throw ValidationException::withMessages(['cycle_id' => 'La convocatoria no tiene postulantes.']);
         }
         DB::transaction(function () use ($data, $base) {
-            $input = ['base' => $base, 'parameters' => ['cycle_id' => (int) $data['cycle_id'], 'alpha' => (float) $data['alpha'], 'factors' => array_map('floatval',$data['factors'] ?? [1,0.75,0.5]), 'limits'=>array_map('floatval',$data['limits'] ?? [1,1,1]), 'unavailable'=>$data['unavailable'] ?? []]];
+            $input = ['base' => $base, 'parameters' => ['cycle_id' => (int) $data['cycle_id'], 'alpha' => (float) $data['alpha'], 'factors' => array_map('floatval', $data['factors'] ?? [1, 0.75, 0.5]), 'limits' => array_map('floatval', $data['limits'] ?? [1, 1, 1]), 'unavailable' => $data['unavailable'] ?? []]];
             $id = DB::table('scenario_studies')->insertGetId(['name' => $data['name'], 'alpha' => $data['alpha'], 'matrix' => '{}', 'result' => '{}', 'input' => json_encode($input), 'execution_status' => 'en_cola', 'created_by' => auth()->id(), 'created_at' => now(), 'updated_at' => now()]);
-            \App\Jobs\ComputeScenario::dispatch($id)->onQueue('optimization')->afterCommit();
+            ComputeScenario::dispatch($id)->onQueue('optimization')->afterCommit();
             Audit::record('escenario.encolado', ['id' => $id]);
         });
 
-        return back()->with('status','Simulación encolada. Consulta su progreso para revisar las nueve combinaciones.');
+        return back()->with('status', 'Simulación encolada. Consulta su progreso para revisar las nueve combinaciones.');
     }
 }

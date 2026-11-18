@@ -21,7 +21,7 @@ class PresentationDemoSeeder extends Seeder
             return;
         }
         DB::transaction(function () {
-            $cycle = DB::table('cycles')->where('name', 'Convocatoria de demostración · Medicina Interna')->first();
+            $cycle = DB::table('cycles')->where('name', 'like', '%Medicina Interna%')->first();
             if (! $cycle || $cycle->status !== 'abierta') {
                 throw new \RuntimeException('Se requiere la convocatoria abierta inicial de demostración.');
             }

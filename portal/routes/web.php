@@ -1,20 +1,30 @@
 <?php
 
-use App\Http\Controllers\{AccountController, AuthController, ClinicalController, ImportController, ManagementController, OtpController, PortalController, ReportController, RotationController, ScenarioController, ShiftController, SwapController};
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ClinicalController;
+use App\Http\Controllers\ManagementController;
+use App\Http\Controllers\OtpController;
+use App\Http\Controllers\PortalController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RotationController;
+use App\Http\Controllers\ScenarioController;
+use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\SwapController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/panel');
 Route::middleware('guest')->group(function () {
     Route::view('/login', 'auth.login')->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:60,1');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:60,1,login:');
     Route::view('/recuperar', 'auth.forgot')->name('password.request');
     Route::post('/recuperar', [OtpController::class, 'request'])->name('password.email');
     Route::get('/codigo', [OtpController::class, 'form'])->name('otp.verify');
-    Route::post('/codigo', [OtpController::class, 'verify'])->middleware('throttle:30,1')->name('otp.check');
+    Route::post('/codigo', [OtpController::class, 'verify'])->middleware('throttle:30,1,otp-verify:')->name('otp.check');
     Route::get('/restablecer', [OtpController::class, 'resetForm'])->name('password.reset');
-    Route::post('/restablecer', [OtpController::class, 'complete'])->middleware('throttle:10,1')->name('password.update');
+    Route::post('/restablecer', [OtpController::class, 'complete'])->middleware('throttle:10,1,password-reset:')->name('password.update');
 });
-Route::get('/verificar/{token}', [ReportController::class, 'verify'])->middleware('throttle:30,1')->name('reports.verify');
+Route::get('/verificar/{token}', [ReportController::class, 'verify'])->middleware('throttle:30,1,report-verify:')->name('reports.verify');
 Route::middleware(['auth', 'role:administrador,coordinador,tutor,interno'])->group(function () {
     Route::get('/panel', [PortalController::class, 'index'])->name('dashboard');
     Route::get('/mi-cuenta', [AccountController::class, 'index'])->name('account');
@@ -32,10 +42,8 @@ Route::middleware(['auth', 'role:administrador,coordinador,tutor,interno'])->gro
     Route::middleware('role:administrador,coordinador')->group(function () {
         Route::get('/gestion/{resource}', [ManagementController::class, 'index'])->name('management');
         Route::get('/gestion/{resource}/{id}/editar', [ManagementController::class, 'index'])->name('management.edit');
+        Route::delete('/gestion/{resource}/{id}', [ManagementController::class, 'destroy'])->name('management.destroy');
         Route::post('/gestion/{resource}/{id?}', [ManagementController::class, 'save'])->name('management.save');
-        Route::post('/nomina/importar', [ImportController::class, 'preview'])->name('users.import');
-        Route::post('/nomina/confirmar', [ImportController::class, 'store'])->name('users.import.confirm');
-        Route::get('/nomina/plantilla', [ImportController::class, 'template'])->name('users.import.template');
     });
     Route::middleware('role:coordinador,tutor,interno')->group(function () {
         Route::get('/rotes', [RotationController::class, 'index'])->name('rotations');
@@ -74,7 +82,7 @@ Route::middleware(['auth', 'role:administrador,coordinador,tutor,interno'])->gro
         Route::get('/escenarios/{study}/estado', [ScenarioController::class, 'status'])->middleware('role:coordinador')->name('scenarios.status');
         Route::get('/guardias/lotes/{batch}/estado', [ShiftController::class, 'status'])->middleware('role:coordinador')->name('shifts.status');
         Route::get('/escenarios', [ScenarioController::class, 'index'])->name('scenarios');
-        Route::post('/escenarios/simular', [ScenarioController::class, 'simulate'])->middleware('throttle:3,1')->name('scenarios.simulate');
+        Route::post('/escenarios/simular', [ScenarioController::class, 'simulate'])->middleware('throttle:3,1,scenario-simulate:')->name('scenarios.simulate');
         Route::post('/escenarios', [ScenarioController::class, 'store'])->name('scenarios.store');
         Route::post('/escenarios/{study}/elegir', [ScenarioController::class, 'choose'])->name('scenarios.choose');
         Route::post('/guardias/generar', [ShiftController::class, 'generate'])->name('shifts.generate');

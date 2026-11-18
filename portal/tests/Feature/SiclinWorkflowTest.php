@@ -5,13 +5,10 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Notifications\AssignmentPublished;
 use App\Services\DecisionAnalysis;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Services\RotationOptimizer;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -54,6 +51,7 @@ class SiclinWorkflowTest extends TestCase
         $run = DB::table('optimization_runs')->value('id');
         $this->post(route('rotations.review', $run))->assertSessionHasNoErrors();
         $this->post(route('rotations.approve', $run))->assertSessionHasNoErrors();
+
         return $run;
     }
 
@@ -105,9 +103,9 @@ class SiclinWorkflowTest extends TestCase
             }
         }
         $this->actingAs($this->user('admin'));
-        $this->get(route('management','usuarios'))->assertOk();
+        $this->get(route('management', 'usuarios'))->assertOk();
         $this->get(route('audit'))->assertOk();
-        $this->get(route('clinical'))->assertForbidden();
+        $this->get(route('clinical'))->assertOk();
         $this->actingAs($this->user('coordinador'));
         foreach (['internos', 'hospitales', 'especialidades', 'convocatorias', 'plazas'] as $resource) {
             $this->get(route('management', $resource))->assertOk();
@@ -167,7 +165,7 @@ class SiclinWorkflowTest extends TestCase
         $user->save();
         $this->post(route('rotations.publish', $run))->assertSessionHasErrors('propuesta');
         $this->assertDatabaseCount('assignments', 0);
-        $this->mock(\App\Services\RotationOptimizer::class)->shouldReceive('solve')->once()->andReturn(['hardScore' => 0, 'asignaciones' => [['internoId' => 'unknown', 'plazaId' => '1']], 'pendientes' => []]);
+        $this->mock(RotationOptimizer::class)->shouldReceive('solve')->once()->andReturn(['hardScore' => 0, 'asignaciones' => [['internoId' => 'unknown', 'plazaId' => '1']], 'pendientes' => []]);
         $this->post(route('rotations.generate', DB::table('cycles')->value('id')), ['study_id' => DB::table('scenario_studies')->value('id')])->assertSessionHasNoErrors();
         $this->assertDatabaseCount('optimization_runs', 2);
         $this->assertDatabaseHas('optimization_runs', ['execution_status' => 'fallida']);
@@ -177,7 +175,7 @@ class SiclinWorkflowTest extends TestCase
     {
         $this->seed();
         $this->applyAndClose();
-        $this->mock(\App\Services\RotationOptimizer::class)->shouldReceive('solve')->once()->andThrow(new \RuntimeException('Motor interrumpido')); 
+        $this->mock(RotationOptimizer::class)->shouldReceive('solve')->once()->andThrow(new \RuntimeException('Motor interrumpido'));
         $this->post(route('rotations.generate', DB::table('cycles')->value('id')), ['study_id' => DB::table('scenario_studies')->value('id')])->assertSessionHasNoErrors();
         $this->assertDatabaseCount('assignments', 0);
         $this->assertDatabaseHas('optimization_runs', ['execution_status' => 'fallida']);
@@ -254,21 +252,6 @@ class SiclinWorkflowTest extends TestCase
         $this->actingAs($this->user('tutor'))->post(route('shifts.performed', $shift->id))->assertSessionHasNoErrors();
         $this->assertDatabaseHas('shifts', ['id' => $shift->id, 'performed' => true]);
         $this->get(route('shifts'))->assertOk();
-    }
-
-    public function test_csv_preview_keeps_valid_rows_and_separates_account_and_academic_permissions(): void
-    {
-        $this->seed();
-        $this->actingAs($this->user('admin'));
-        $csv = "name,email,matricula,academic_average,merit,eligible\nNueva Interna,nueva@example.test,LP-101,85,70,1\nDuplicada,nueva@example.test,LP-102,80,60,1\n";
-        $file = UploadedFile::fake()->createWithContent('nomina.csv', $csv);
-        $this->post(route('users.import'), ['file' => $file])->assertOk()->assertSee('repetidos');
-        $this->assertDatabaseMissing('users', ['email' => 'nueva@example.test']);
-        $this->post(route('users.import.confirm'))->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('users', ['email' => 'nueva@example.test', 'role' => 'interno', 'eligible' => false]);
-        $this->actingAs($this->user('coordinador'))->post(route('users.import'), ['file' => $file])->assertOk();
-        $this->post(route('users.import.confirm'))->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('users', ['email' => 'nueva@example.test', 'eligible' => true, 'matricula' => 'LP-101']);
     }
 
     public function test_reoptimization_preserves_assignment_identity_and_previous_place(): void

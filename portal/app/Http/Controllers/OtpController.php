@@ -18,6 +18,7 @@ class OtpController extends Controller
         $id = $otp->request($data['email'], $purpose, $request->ip());
         $request->session()->forget('otp_grant');
         $request->session()->put(['otp_challenge' => $id, 'otp_purpose' => $purpose]);
+
         return redirect()->route('otp.verify')->with('status', OtpService::MESSAGE);
     }
 
@@ -35,6 +36,7 @@ class OtpController extends Controller
         }
         $request->session()->regenerate();
         $request->session()->put('otp_grant', $grant);
+
         return redirect()->route('password.reset');
     }
 
@@ -51,6 +53,7 @@ class OtpController extends Controller
         }
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        return redirect()->route('login')->with('status', 'Contraseña actualizada. Ingresa con tu nueva contraseña.');
+
+        return redirect()->route('login')->with('status', 'Contraseña actualizada. Puedes ingresar cuando tu cuenta esté activa y habilitada por Coordinación.');
     }
 }

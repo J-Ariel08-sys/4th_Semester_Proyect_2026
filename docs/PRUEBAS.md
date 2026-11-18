@@ -1,6 +1,18 @@
 # Evidencia de revisión · 17 de noviembre de 2026
 
-## Resultados ejecutados en este equipo
+## Ampliación de datos: revisión más reciente
+
+- PHPUnit con PostgreSQL separado: **44 pruebas, 679 aserciones, 0 fallos**, 12.467 s.
+- Playwright en `siclin-demo-expanded-test`, una instancia temporal en 8011: **3 pruebas, 0 fallos**, 40.5 s. Incluye datos ampliados, los menús de cuatro roles a 320 px y el recorrido completo de postulación, cálculo, publicación, guardias y seguimiento.
+- Playwright sobre la demo conservada en 8010: **1 prueba de consulta, 0 fallos**, 4.8 s. Verifica datos académicos, los dos pendientes del caso de escasez, PDF descargables y privacidad de la libreta del interno.
+- Carga repetida comprobada sin duplicados ni reinicio de avances. Se compararon todos los registros anteriores de quince tablas, incluidos usuarios, hospitales personalizados, postulaciones, notas y documentos: permanecieron intactos tras la carga.
+- Corregido el listado de reportes: Coordinación ve actas compartidas y documentos propios; las libretas personales de otros usuarios no aparecen como descargas disponibles. Los permisos de descarga se mantienen.
+
+Estado actual en 8010: **29 usuarios, 2 cohortes, 10 requisitos, 7 hospitales, 9 convocatorias, 60 postulaciones, 37 asignaciones, 61 registros clínicos, 4 incidencias, 5 estudios, 8 PDF y 4 guardias**. Se conservó el registro clínico y el PDF que ya existían. La instancia temporal usada para las acciones de prueba se retiró; la demo habitual conserva sus propuestas e incidencias preparadas para la exposición.
+
+Registros: `.local/verification/expanded-phpunit.log`, `expanded-browser.log` y `expanded-live-browser.log`. Preparación y cuentas: [GUIA_DEMOS.md](GUIA_DEMOS.md). Las secciones siguientes conservan la evidencia de la revisión anterior.
+
+## Resultados de la revisión anterior
 
 | Comprobación | Resultado |
 |---|---|
@@ -54,6 +66,6 @@ Ejecuta las suites de navegador en secuencia: `e2e.sh` instala dependencias en e
 - La copia antes de reiniciar la demo respalda su base, no los PDF privados ni la configuración completa del sistema.
 - La revisión visual cubrió los paneles y la navegación indicada. No equivale a una auditoría formal de accesibilidad ni de seguridad.
 
-## Estado entregado para presentar
+## Estado entregado en la revisión anterior
 
 Después del recorrido automatizado se ejecutó `demo-up.sh --reset`. Se verificaron 8 cuentas, 2 postulaciones precargadas, 1 rote clínico, 0 registros de asistencia y 0 guardias confirmadas. Los recuentos de usuarios/postulaciones/asignaciones/seguimiento de la base de trabajo permanecieron iguales antes y después del reinicio. La demo quedó disponible en 8010, con Mailpit en 8030 y las claves nuevas en `.local/presentation-accounts.json` (permisos 600). Se volvió a comprobar el acceso y toda la navegación de los cuatro roles tras el reinicio.

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-const accounts = JSON.parse(fs.readFileSync(new URL('../../.local/presentation-accounts.json', import.meta.url)));
+const accounts = JSON.parse(fs.readFileSync(process.env.SICLIN_DEMO_ACCOUNTS_FILE || new URL('../../.local/presentation-accounts.json', import.meta.url)));
 const screenshotDir = new URL('../../.local/demo-screenshots/', import.meta.url);
 fs.mkdirSync(screenshotDir, { recursive: true, mode: 0o700 });
 async function login(page, name) {
@@ -23,6 +23,49 @@ async function pdf(page) {
 }
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/La_Paz', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 test.describe.configure({ mode: 'serial' });
+
+test('demo ampliada: datos visibles, cálculos de escasez, documentos y alcance del interno', async ({ page }) => {
+  await login(page, 'coordinador');
+  for (const [resource, text] of [
+    ['cohortes', 'DEMO ampliada · A · trayectoria clínica'],
+    ['hospitales', 'Centro E · convenio vencido'],
+    ['internos', 'Alex Pendiente Demo'],
+  ]) {
+    await page.goto(`/gestion/${resource}`);
+    await expect(page.locator('main')).toContainText(text);
+  }
+  await page.goto('/rotes');
+  await expect(page.locator('[data-cycle-id]').filter({ hasText: 'DEMO ampliada' })).toHaveCount(7);
+  const shortage = page.locator('[data-run-cycle-id]').filter({ hasText: 'Cupos insuficientes' });
+  await expect(shortage.locator('.stat').filter({ hasText: 'Asignados' }).locator('strong')).toHaveText('2');
+  await expect(shortage.locator('.stat').filter({ hasText: 'Pendientes' }).locator('strong')).toHaveText('2');
+  await page.goto('/escenarios');
+  const study = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'DEMO ampliada · Escenarios: Cupos insuficientes · Salud Pública', exact: true }) });
+  await study.getByText('Resultados calculados y sensibilidad de cupos', { exact: true }).click();
+  const metrics = study.locator('details').filter({ hasText: 'Resultados calculados y sensibilidad de cupos' }).locator('tbody tr');
+  await expect(metrics).toHaveCount(9);
+  await expect(metrics.first().locator('td').nth(2)).toHaveText('2');
+  await expect(metrics.first().locator('td').nth(3)).toHaveText('2');
+  await page.goto('/reportes');
+  const act = page.locator('#documentos tr').filter({ hasText: 'DEMO ampliada · Seguimiento activo' });
+  await expect(act).toHaveCount(1);
+  const actUrl = await act.getByRole('link', { name: 'Descargar PDF' }).getAttribute('href');
+  await pdf(page);
+  await logout(page);
+
+  await login(page, 'interno.demo01');
+  await page.goto('/seguimiento');
+  await expect(page.locator('main')).toContainText('Sofía Ampliación Demo');
+  await expect(page.locator('main')).not.toContainText('Gabriel Ampliación Demo');
+  const history = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Sofía Ampliación Demo', exact: true }) }).filter({ hasText: 'Cirugía' });
+  await history.getByText('Historial de seguimiento (3)', { exact: true }).click();
+  await expect(history.getByRole('cell', { name: 'Presente', exact: true }).first()).toBeVisible();
+  await page.goto('/reportes');
+  await pdf(page);
+  expect((await page.request.get(actUrl)).status()).toBe(403);
+  await page.goto('/ayuda');
+  await expect(page.getByRole('heading', { name: 'Casos de la demo ampliada' })).toBeVisible();
+});
 
 test('cuatro roles: inicio, guía, destinos del menú y vista móvil sin desbordamiento', async ({ browser }) => {
   for (const name of ['admin', 'coordinador', 'tutor', 'interno']) {
@@ -51,6 +94,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await login(page, 'interno');
   await page.goto('/rotes');
   const cycle = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Convocatoria de demostración · Medicina Interna' }) });
+  const cycleId = await cycle.getAttribute('data-cycle-id');
   const startDay = (await cycle.locator('.card-head .help').textContent()).match(/\d{4}-\d{2}-\d{2}/)[0];
   await cycle.getByText('Registrar mis preferencias', { exact: true }).click();
   const application = cycle.locator('form[action$="/postular"]');
@@ -62,7 +106,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
 
   await login(page, 'coordinador');
   await page.goto('/rotes');
-  await page.getByRole('button', { name: 'Cerrar postulaciones' }).click();
+  await cycle.getByRole('button', { name: 'Cerrar postulaciones' }).click();
   await page.goto('/escenarios');
   const simulation = page.locator('form[action$="/escenarios/simular"]');
   await simulation.locator('[name=cycle_id]').selectOption({ label: 'Convocatoria de demostración · Medicina Interna' });
@@ -80,13 +124,14 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await study.locator('[name=justification]').fill('Priorizamos las preferencias y el mérito en esta convocatoria de demostración.');
   await study.getByRole('button', { name: 'Aprobar política' }).click();
   await page.goto('/rotes');
-  const generate = page.locator('form[action$="/optimizar"]').first();
-  await generate.locator('select').selectOption({ index: 1 });
+  const generate = cycle.locator('form[action$="/optimizar"]');
+  await generate.locator('select').selectOption({ label: 'Demo calculada en navegador · A1' });
   await generate.getByRole('button', { name: 'Calcular propuesta' }).click();
-  await expect(page.getByRole('button', { name: 'Pasar a revisión' })).toBeVisible({ timeout: 30000 });
-  await page.getByRole('button', { name: 'Pasar a revisión' }).click();
-  await page.getByRole('button', { name: 'Aprobar plan', exact: true }).click();
-  await page.getByRole('button', { name: 'Publicar asignaciones' }).click();
+  const run = page.locator(`[data-run-cycle-id="${cycleId}"]`).first();
+  await expect(run.getByRole('button', { name: 'Pasar a revisión' })).toBeVisible({ timeout: 30000 });
+  await run.getByRole('button', { name: 'Pasar a revisión' }).click();
+  await run.getByRole('button', { name: 'Aprobar plan', exact: true }).click();
+  await run.getByRole('button', { name: 'Publicar asignaciones' }).click();
   await expect(page.getByRole('status')).toContainText('Asignaciones publicadas');
   await page.goto('/reportes');
   await page.locator('form').filter({ hasText: 'Convocatoria de demostración · Medicina Interna' }).getByRole('button', { name: 'Generar acta PDF' }).click();
@@ -154,7 +199,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await logout(page);
   await login(page, 'coordinador');
   await page.goto('/seguimiento');
-  const resolution = page.locator('form[action$="/resolver"]');
+  const resolution = camila.locator('form[action$="/resolver"]');
   await resolution.locator('[name=resolution]').fill('Se revisó la observación; se conserva el registro original de demostración.');
   await resolution.getByRole('button', { name: 'Registrar resolución' }).click();
   await expect(page.getByRole('status')).toContainText('Resolución registrada');

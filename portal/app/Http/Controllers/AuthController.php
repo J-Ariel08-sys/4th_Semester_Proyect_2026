@@ -2,17 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Services\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
 {
@@ -29,6 +24,14 @@ class AuthController extends Controller
             Audit::record('sesion.fallida', ['identificador' => hash('sha256', $data['email'])]);
 
             return back()->withErrors(['email' => 'Credenciales inválidas o cuenta inactiva.']);
+        }
+        if (! Auth::user()->hasAccessApproval()) {
+            Audit::record('sesion.pendiente_habilitacion');
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return back()->withErrors(['email' => 'Tu contraseña es correcta, pero Coordinación debe completar tu habilitación antes de que puedas ingresar.'])->withInput($request->only('email'));
         }
         RateLimiter::clear($key);
         $request->session()->regenerate();
@@ -47,5 +50,4 @@ class AuthController extends Controller
 
         return redirect()->route('login');
     }
-
 }

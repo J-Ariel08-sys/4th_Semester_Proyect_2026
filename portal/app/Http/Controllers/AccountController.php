@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendSecurityNotice;
 use App\Models\User;
-use App\Services\{Audit, OtpService, Settings};
+use App\Services\AccountAccess;
+use App\Services\Audit;
+use App\Services\OtpService;
+use App\Services\Settings;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\{DB, Hash};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -26,16 +31,15 @@ class AccountController extends Controller
             $user->phone = $data['phone'] ?? null;
             if (! empty($data['password'])) {
                 $user->password = Hash::make($data['password']);
-                $user->security_version++;
-                $user->remember_token = null;
-                DB::table('sessions')->where('user_id', $user->id)->delete();
+                $user->forceFill(AccountAccess::revoke($user));
                 $request->session()->put('security_version', $user->security_version);
-                \App\Jobs\SendSecurityNotice::dispatch($user->id, config('siclin.mail_mode'))->onQueue(config('siclin.mail_queue'))->afterCommit();
+                SendSecurityNotice::dispatch($user->id, config('siclin.mail_mode'))->onQueue(config('siclin.mail_queue'))->afterCommit();
             }
             $user->save();
             Audit::record('cuenta.actualizada', ['usuario' => $user->id]);
         });
         $request->session()->regenerate();
+
         return back()->with('status', 'Datos personales actualizados.');
     }
 
@@ -43,6 +47,7 @@ class AccountController extends Controller
     {
         abort_unless($user->active && ! $user->activated_at, 422, 'La cuenta debe estar habilitada y pendiente de activación.');
         $otp->request($user->email, 'activation', $request->ip());
+
         return back()->with('status', 'Se solicitó el código de activación. El destinatario debe abrir Recuperar acceso → Activar mi cuenta nueva.');
     }
 
@@ -55,6 +60,7 @@ class AccountController extends Controller
     {
         $data = $request->validate(['support' => 'required|string|max:200']);
         Settings::set('general', $data);
+
         return back()->with('status', 'Configuración guardada.');
     }
 
@@ -65,6 +71,7 @@ class AccountController extends Controller
             throw ValidationException::withMessages(['weights' => 'Los cuatro pesos deben sumar 100 %.']);
         }
         Settings::set('rubric', $data['weights']);
+
         return back()->with('status', 'Rúbrica de demostración actualizada; los registros anteriores conservan su cálculo.');
     }
 }

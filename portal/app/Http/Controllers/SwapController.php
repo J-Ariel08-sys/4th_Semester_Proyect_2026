@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AssignmentHistory;
 use App\Services\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,7 +53,7 @@ class SwapController extends Controller
             $hospital = DB::table('hospitals')->find($place->hospital_id);
             $user = DB::table('users')->find($assignment->user_id);
             $tutor = DB::table('users')->find($place->tutor_id);
-            if (now()->gte($cycle->starts_on) || ! $user->active || ! $user->eligible || ! $tutor->active || ! $hospital->active || $hospital->agreement_until < $cycle->ends_on || DB::table('clinical_records')->where('assignment_id', $assignment->id)->exists() || DB::table('shifts')->where('assignment_id', $assignment->id)->exists()) {
+            if ($cycle->deleted_at || $place->deleted_at || now()->gte($cycle->starts_on) || ! $user->active || ! $user->eligible || ! $tutor->active || ! $tutor->access_approved_at || ! $hospital->active || $hospital->agreement_until < $cycle->ends_on || DB::table('clinical_records')->where('assignment_id', $assignment->id)->exists() || DB::table('shifts')->where('assignment_id', $assignment->id)->exists()) {
                 throw ValidationException::withMessages(['permuta' => 'Solo se permutan rotes futuros sin seguimiento ni guardias, con internos habilitados y convenios vigentes.']);
             }
         }
@@ -73,14 +74,14 @@ class SwapController extends Controller
                 throw ValidationException::withMessages(['permuta' => 'Las asignaciones cambiaron. Solicita una nueva permuta.']);
             }
             $this->validateAssignments([$source, $target]);
-            \App\Services\AssignmentHistory::capture($source, 'Permuta #'.$swap);
-            \App\Services\AssignmentHistory::capture($target, 'Permuta #'.$swap);
+            AssignmentHistory::capture($source, 'Permuta #'.$swap);
+            AssignmentHistory::capture($target, 'Permuta #'.$swap);
             DB::table('assignments')->where('id', $source->id)->update(['place_id' => $target->place_id, 'tutor_id' => $target->tutor_id, 'updated_at' => now()]);
             DB::table('assignments')->where('id', $target->id)->update(['place_id' => $source->place_id, 'tutor_id' => $source->tutor_id, 'updated_at' => now()]);
             DB::table('swap_requests')->where('id', $swap)->update(['status' => 'aprobada', 'updated_at' => now()]);
             Audit::record('permuta.aprobada', ['id' => $swap, 'origen' => $source->place_id, 'destino' => $target->place_id]);
         });
 
-        return back()->with('status','Permuta aprobada. Se conservan los cupos y el historial de la decisión.');
+        return back()->with('status', 'Permuta aprobada. Se conservan los cupos y el historial de la decisión.');
     }
 }

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Database\Seeders\ClinicalDemoSeeder;
+use Database\Seeders\ExpandedDemoSeeder;
 use Database\Seeders\PresentationDemoSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
@@ -50,6 +51,9 @@ class SiclinDemo extends Command
             }
         }
         if (! $this->refreshDemoCredentials()) {
+            return self::FAILURE;
+        }
+        if ($this->call('db:seed', ['--class' => ExpandedDemoSeeder::class, '--force' => true]) !== self::SUCCESS) {
             return self::FAILURE;
         }
         $this->info('Demo preparada. Consulta /ayuda con cada rol; claves en el archivo privado demo-accounts.json.');

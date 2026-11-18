@@ -54,3 +54,35 @@ document.querySelectorAll('[data-run-status]').forEach(async element => {
   };
   if (['en_cola','ejecutando'].includes(element.dataset.initial)) poll();
 });
+
+const themeButtons = document.querySelectorAll('[data-theme-toggle]');
+function renderThemeButtons() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  themeButtons.forEach(button => {
+    button.textContent = dark ? 'Modo claro' : 'Modo oscuro';
+    button.setAttribute('aria-pressed', String(dark));
+    button.setAttribute('aria-label', dark ? 'Activar modo claro' : 'Activar modo oscuro');
+  });
+}
+themeButtons.forEach(button => button.addEventListener('click', () => {
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('siclin-theme', theme); } catch {}
+  renderThemeButtons();
+}));
+renderThemeButtons();
+document.querySelectorAll('[data-password-target]').forEach(button => {
+  const input = document.getElementById(button.dataset.passwordTarget);
+  const label = document.querySelector(`label[for="${input.id}"]`).textContent.toLowerCase();
+  button.addEventListener('click', () => {
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    button.textContent = visible ? 'Ocultar' : 'Mostrar';
+    button.setAttribute('aria-pressed', String(visible));
+    button.setAttribute('aria-label', `${visible ? 'Ocultar' : 'Mostrar'} ${label}`);
+  });
+});
+const topbar = document.querySelector('.topbar');
+if (topbar && 'ResizeObserver' in window) {
+  new ResizeObserver(() => document.documentElement.style.setProperty('--topbar-height', `${topbar.offsetHeight}px`)).observe(topbar);
+}

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <script src="{{ asset('theme.js') }}"></script>
     <title>{{ $title ?? 'Panel' }} · SICLIN</title>
     @if(file_exists(public_path('build/manifest.json')))
         @vite(['resources/css/app.css','resources/js/app.js'])
@@ -36,15 +37,16 @@
                     </details>
                 @endif
             @endforeach
-            <a href="{{ route('help') }}" @if(request()->routeIs('help')) aria-current="page" @endif>{{ config('siclin.demo') ? 'Guía de demostración' : 'Ayuda' }}</a>
+            <a href="{{ route('help') }}" @if(request()->routeIs('help')) aria-current="page" @endif>Ayuda</a>
             <form method="post" action="{{ route('logout') }}">@csrf<button class="button secondary">Cerrar sesión</button></form>
         </nav>
     </aside>
     <div class="workspace">
         <header class="topbar">
-            <button type="button" class="nav-toggle button secondary" aria-controls="navigation" aria-expanded="false">Menú de navegación</button>
+            <button type="button" class="nav-toggle button secondary" aria-label="Menú de navegación" aria-controls="navigation" aria-expanded="false">Menú</button>
             <span class="page-context">{{ $title ?? 'Panel' }}</span>
             <div class="account">
+                <button type="button" class="button secondary theme-toggle" data-theme-toggle aria-pressed="false">Modo oscuro</button>
                 <a href="{{ route('dashboard') }}#notificaciones" aria-label="Notificaciones">Avisos</a>
                 <a href="{{ route('account') }}">Mi cuenta</a>
                 <span><strong>{{ auth()->user()->name }}</strong><small>{{ ucfirst(auth()->user()->role) }}</small></span>
@@ -53,10 +55,8 @@
         <main id="contenido">
 @else
     <div class="guest"><main id="contenido">
+    <div class="guest-tools"><button type="button" class="button secondary theme-toggle" data-theme-toggle aria-pressed="false">Modo oscuro</button></div>
 @endauth
-@if(config('siclin.demo'))
-    <div class="demo-banner">Demostración · datos ficticios @auth<span>{{ ucfirst(auth()->user()->role) }} · <a href="{{ route('help') }}">Ver recorrido</a></span>@endauth</div>
-@endif
 @if(session('status'))<div class="notice success" role="status">{{ session('status') }}</div>@endif
 @if($errors->any())
     <div class="notice error" role="alert"><strong>Revisa los datos</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>

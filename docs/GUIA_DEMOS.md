@@ -13,7 +13,7 @@ Abre http://localhost:8010 y, en otra pestaña, http://localhost:8030 (Mailpit).
 
 Usa perfiles de navegador distintos si quieres mantener varios roles abiertos. Varias pestañas del mismo perfil comparten sesión: para cambiar de rol, pulsa **Cerrar sesión** y vuelve a ingresar. La cookie de demo es independiente de la instancia de trabajo.
 
-En cada rol, **Guía de demostración** muestra las instrucciones correspondientes. Un segundo `demo-up.sh` conserva cuentas, claves, postulaciones y notas. Para repetir desde cero, o si las fechas ya vencieron:
+En cada rol, **Guía de demostración** muestra las instrucciones correspondientes. Un segundo `demo-up.sh` conserva postulaciones, notas y decisiones; restaura las claves de las ocho cuentas originales y conserva las claves de las cuentas adicionales. Para repetir desde cero, o si las fechas ya vencieron:
 
 ```bash
 ./scripts/demo-up.sh --reset
@@ -35,20 +35,59 @@ Solo se reinicia la base `siclin_demo` del proyecto Docker `siclin-demo`. Se gua
 
 El rote retrospectivo y la guardia de Camila son datos iniciales de demostración. La asignación se calcula con el motor PHP; el seeder carga su publicación y el turno directamente para poder mostrar seguimiento sin esperar una semana. **La prueba del proceso de aprobación/publicación se hace con Medicina Interna**, usando los botones normales.
 
+## Datos ampliados: apartados listos para mostrar
+
+`demo-up.sh` incorpora esta ampliación una sola vez, sin borrar los casos anteriores ni duplicar registros. Busca el prefijo **DEMO ampliada**. Agrega 20 cuentas, 2 cohortes, 10 requisitos, 3 hospitales, 7 convocatorias, 58 postulaciones, 36 asignaciones publicadas, 60 registros de seguimiento, 4 incidencias, 3 guardias, una permuta consentida y 7 PDF. También calcula cinco propuestas de asignación y tres estudios de nueve combinaciones; incluye un ejercicio manual adicional de costos, identificado como hipotético.
+
+Las fechas son relativas al día de la primera carga. Los expedientes históricos y en curso son ejemplos retrospectivos: sus asignaciones se calculan con el motor PHP y su publicación se carga como dato inicial para poder mostrar seguimiento. La convocatoria futura de Ginecología sí pasa por los servicios normales de aprobación y publicación. Las notas, los escenarios, la planificación de guardias y los PDF utilizan los servicios reales.
+
+| Apartado y rol | Qué abrir | Qué mostrar o hacer en vivo |
+|---|---|---|
+| Gestión académica · Coordinación | Cohortes A/B, Requisitos, Internos, Hospitales | Trayectoria clínica y planificación pendiente; habilitar a Alex; comparar centros activos con Centro E inactivo y convenio vencido |
+| Postulación y rotes · Interno/Coordinación | **Oferta abierta · Pediatría** | Seis postulaciones preparadas. Daniela (`interno.demo07`) puede enviar una nueva y abrir su comprobante |
+| Postulación y rotes · Coordinación | **Propuesta para revisar · Medicina Interna** | Doce asignados, cero pendientes. En Propuestas y versiones, abrir asignaciones, aprobar el plan y publicar |
+| Postulación y rotes · Coordinación | **Cupos insuficientes · Salud Pública** | Cuatro postulantes, dos cupos utilizables: dos asignados y dos pendientes. No se puede aprobar una propuesta incompleta |
+| Escenarios y decisiones · Coordinación | **Escenarios: Propuesta para revisar**, **Cupos insuficientes** y **Rotes publicados** | Abrir resultados y sensibilidad; comparar A1/A2/A3 frente a 100 %, 75 % y 50 % de capacidad; explicar Maximin, Maximax, Laplace, Hurwicz y Savage |
+| Seguimiento · Tutor/Coordinación | **Cirugía**, Sofía/Gabriel/Mariana | Tres registros por interno, asistencias y notas; registrar hoy si está libre. Dos incidencias abiertas y dos resueltas |
+| Seguimiento · Coordinación | **Permutas consensuadas**, Ginecología | Una solicitud ya consentida por ambos internos; mostrar y aprobar antes de agregar guardias a esos rotes |
+| Documentos y reportes · Coordinación | **Archivo · Salud Pública**, **Seguimiento activo · Cirugía**, **Rotes publicados · Ginecología** | Tres actas ya emitidas, ocupación, promedios, descarga de PDF y verificación por QR |
+| Mi libreta y documentos · Interno | Sofía o Gabriel | Tres rotes, historial clínico y libreta PDF ya generada; solo se muestra su propio ámbito |
+| Disponibilidad y guardias · Tutor/Coordinación | **Cirugía** | Tres turnos calculados y aprobados, dos realizados y uno pendiente de confirmar |
+| Gestión académica · Coordinación | **Preparación · Cirugía** | Convocatoria en borrador con plazas; abrir postulaciones durante los primeros diez días desde la carga |
+
+Accesos adicionales, todos con contraseña inicial **`SiclinDemo2026!`**:
+
+| Cuenta | Uso recomendado |
+|---|---|
+| `interno.demo01@siclin.test` · Sofía | Demo completa de historial, incidencias, tres rotes y PDF propio |
+| `interno.demo02@siclin.test` · Gabriel | Segundo expediente completo y contraparte de la permuta preparada |
+| `interno.demo07@siclin.test` · Daniela | Postulación nueva a Pediatría; también tiene historial clínico |
+| `interno.demo13@siclin.test` a `interno.demo16@siclin.test` | Participantes del caso de escasez de cupos |
+| `interno.pendiente@siclin.test` · Alex | Cuenta activa pendiente de cohorte y habilitación académica |
+| `tutor.demo1@siclin.test` · Elena | Supervisión del Centro Clínico C |
+| `tutor.demo2@siclin.test` y `tutor.demo3@siclin.test` | Rafael e Inés supervisan los rotes futuros de Ginecología |
+
+Las cuentas `interno.demo01` a `interno.demo12` tienen actividad en tres periodos. Lucía (`tutor`) y Mateo (`tutor2`) supervisan el seguimiento ampliado en las dos sedes iniciales, conservando sus casos originales. Los nombres de hospitales que hayas personalizado se mantienen. Las cuentas y claves iniciales están en `.local/presentation-accounts.json`. Si cambiaste una clave adicional por OTP, usa la nueva: la ampliación no la restablece.
+
+Para la exposición, muestra primero los resultados preparados y después ejecuta una acción en vivo. Cambiar cupos, convenios, habilitación o asignaciones puede invalidar una propuesta calculada; en ese caso recalcula antes de publicar. Las actas son copias del momento de emisión: genera otra después de una permuta o de nuevos registros si necesitas un PDF actualizado.
+
 ## Recorrido recomendado (15–20 minutos)
 
-### 1. Administrador: acceso y permisos (3 minutos)
+### 1. Administrador: cuenta, habilitación y permisos (4 minutos)
 
-Cuenta: `admin@siclin.test`.
+Cuenta: `admin@siclin.test`. Tiene acceso completo a todos los módulos.
 
-1. Inicio → Cuentas de usuario. Crea `invitado@siclin.test`, nombre «Invitado Demo», rol Interno, cuenta habilitada.
-2. Guarda. La cuenta aún necesita activar su contraseña; el administrador no la escribe.
-3. Cierra sesión → Olvidé mi contraseña → **Activar mi cuenta nueva**. Solicita código para ese correo.
-4. Abre Mailpit en 8030. Copia los seis dígitos del correo de activación y verifícalos en el portal.
-5. Define una contraseña de al menos 12 caracteres con letras y números; inicia sesión con ella.
-6. Vuelve como administrador. En Seguridad y auditoría → Bitácora, muestra los eventos. En Roles y permisos, explica la separación: el administrador gestiona accesos; Coordinación gestiona la actividad académica.
+1. Cuentas de usuario → Nuevo registro. Usa un correo ficticio nuevo, nombre «Invitado Demo», rol Interno y Cuenta activa. Define una contraseña confirmada de al menos doce caracteres con letras y números.
+2. Cierra sesión y prueba el nuevo acceso. Aparecerá «Coordinación debe completar tu habilitación».
+3. Entra como `coordinador@siclin.test`. En Cohortes crea una cohorte nueva para este ejemplo, de modo que no se alteren las propuestas preparadas.
+4. Habilitar cuentas → Completar datos de la cuenta nueva. Asigna cohorte, matrícula, promedio y méritos; marca Habilitado académicamente y guarda.
+5. Ingresa con el correo y la contraseña nuevos. Muestra sus menús y su ficha. Para tutores y coordinadores, la pantalla de habilitación permite Autorizar ingreso al portal sin ficha de interno. Los administradores no requieren aprobación.
+6. Vuelve como administrador → Cuentas de usuario → Editar. Cambia la contraseña y confirma. Prueba que la anterior no ingresa y la nueva sí. Las otras sesiones se cierran.
+7. Para demostrar eliminación, edita la cuenta temporal, escribe el motivo y confirma Eliminar registro. En Bitácora busca `gestion.eliminada`; comprueba que la cuenta ya no ingrese.
 
-Resultado: usuario persistido, correo capturado por SMTP y autenticación real. Si repites sin reiniciar, usa un correo nuevo. No intentes usar esta cuenta recién creada como interno habilitado: Coordinación debe habilitarla académicamente.
+La eliminación conserva los registros vinculados como historial. Usa cuentas temporales para este paso. Si prefieres demostrar OTP, deja vacía la contraseña inicial, actívala por correo en Mailpit 8030 y completa igualmente la habilitación antes de ingresar.
+
+El botón Modo oscuro / Modo claro está disponible en todos los roles y en el login. Mostrar / Ocultar alterna la visibilidad de las contraseñas. En móvil, usa Menú para navegar.
 
 ### 2. Interno: postulación (2 minutos)
 
