@@ -1,4 +1,4 @@
-<x-layout title="Seguimiento clínico"><div class="page-heading"><div><p class="eyebrow">MÓDULO 04</p><h1>Seguimiento clínico</h1><p>Asistencia, evaluación y resolución de incidencias por rote.</p></div></div>
+<x-layout title="Seguimiento clínico"><div class="page-heading"><div><h1>Seguimiento clínico</h1></div></div>
 @php($manager=(auth()->user()->managesAcademics()))
 @forelse($assignments as $a)<section class="card"><div class="card-head"><div><h2>{{ $a->intern }}</h2><p class="help">{{ $a->specialty }} · {{ $a->hospital }} · {{ $a->starts_on }} a {{ $a->ends_on }}</p></div><span class="badge">Rote #{{ $a->id }}</span></div>
 @if($a->archived)<p class="notice">Historial archivado: la cuenta, convocatoria o plaza fue eliminada. Puedes consultar los registros y documentos conservados.</p>@endif

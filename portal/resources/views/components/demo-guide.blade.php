@@ -49,7 +49,7 @@
                     <li>En <a href="{{ route('reports') }}">Mi libreta y documentos</a>, genera tu libreta. Sofía y Gabriel ya tienen un PDF disponible.</li>
                 </ol>
             @elseif(auth()->user()->email === 'interno.pendiente@siclin.test')
-                <p>La cuenta está habilitada para ingresar cuando Coordinación completa su ficha académica. Coordinación puede asignarle cohorte y habilitación en Gestión académica → Habilitación de internos; después podrá postular a una oferta compatible.</p>
+                <p>La cuenta está habilitada para ingresar cuando Coordinación completa su ficha académica. Coordinación puede asignarle cohorte y habilitación en Registro → Internos; después podrá postular a una oferta compatible.</p>
             @else
                 <ol class="demo-steps">
                     <li>Para postular en vivo usa <strong>interno@siclin.test</strong> (Ana). Diego y Valeria ya tienen postulaciones de ejemplo.</li>
@@ -69,7 +69,7 @@
     <p>Cargados el {{ $expanded['prepared_on'] }}. Los datos son ficticios; los cálculos y los PDF se generan con los servicios del sistema.</p>
     @if(auth()->user()->role === 'coordinador')
         <div class="table-wrap"><table><thead><tr><th>Apartado</th><th>Caso listo para mostrar</th></tr></thead><tbody>
-            <tr><td>Gestión académica</td><td>Dos cohortes, sus requisitos, internos habilitados y Alex pendiente. Centros C/D activos y E con convenio vencido.</td></tr>
+            <tr><td>Registro</td><td>Dos cohortes, sus requisitos, internos habilitados y Alex pendiente. Centros C/D activos y E con convenio vencido.</td></tr>
             <tr><td>Postulación y rotes</td><td>Pediatría abierta con seis postulaciones; Medicina Interna con una propuesta en revisión; Ginecología publicada; Cirugía en borrador.</td></tr>
             <tr><td>Escenarios y decisiones</td><td>Tres estudios calculados. En «Cupos insuficientes» hay cuatro postulantes y dos cupos utilizables; en Medicina Interna, doce asignados y ninguno pendiente.</td></tr>
             <tr><td>Seguimiento</td><td>Cirugía en curso: doce internos, asistencia y notas. Dos incidencias abiertas y dos resueltas; permuta de Ginecología consentida, pendiente de aprobación.</td></tr>

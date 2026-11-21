@@ -50,7 +50,17 @@ class ManagementController extends Controller
     public function index(string $resource, ?int $id = null): View
     {
         $definition = $this->definition($resource);
-        $rows = DB::table($definition['table'])->whereNull('deleted_at')->when($resource === 'habilitaciones', fn ($q) => $q->where('role', '!=', 'administrador')->orderByRaw('access_approved_at IS NOT NULL'))->when(in_array($resource, ['internos', 'tutores']), fn ($q) => $q->where('role', $resource === 'internos' ? 'interno' : 'tutor'))->orderByDesc('id')->paginate(20);
+        $rows = DB::table($definition['table'])->whereNull('deleted_at')
+            ->when($resource === 'habilitaciones', fn ($query) => $query->where('role', '!=', 'administrador')->orderByRaw('access_approved_at IS NOT NULL'))
+            ->when(in_array($resource, ['internos', 'tutores'], true), fn ($query) => $query->where('role', $resource === 'internos' ? 'interno' : 'tutor'));
+
+        $term = request()->query('buscar');
+        $search = $definition['table'] === 'users' && is_string($term) ? mb_substr(trim($term), 0, 120) : '';
+        if ($search !== '') {
+            $pattern = '%'.addcslashes($search, '%_\\').'%';
+            $rows->where(fn ($query) => $query->whereLike('name', $pattern)->orWhereLike('email', $pattern)->orWhereLike('matricula', $pattern));
+        }
+        $rows = $rows->orderByDesc('id')->paginate(20)->appends($search !== '' ? ['buscar' => $search] : []);
         $edit = $id ? DB::table($definition['table'])->whereNull('deleted_at')->find($id) : null;
         if ($id) {
             abort_unless($edit, 404);
@@ -75,7 +85,7 @@ class ManagementController extends Controller
             'tutor_id' => DB::table('users')->whereNull('deleted_at')->whereNotNull('access_approved_at')->where('role', 'tutor')->where('active', true)->pluck('name', 'id')->all(),
         ];
 
-        return view('management', compact('definition', 'resource', 'rows', 'edit', 'choices'));
+        return view('management', compact('definition', 'resource', 'rows', 'edit', 'choices', 'search'));
     }
 
     public function save(Request $request, string $resource, ?int $id = null): RedirectResponse

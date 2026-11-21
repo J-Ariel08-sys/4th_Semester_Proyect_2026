@@ -24,6 +24,33 @@ class AccessAndManagementTest extends TestCase
         return User::where('email', $name.'@siclin.test')->firstOrFail();
     }
 
+    public function test_account_search_finds_older_records_and_respects_the_role_filter(): void
+    {
+        $this->seed();
+        $tutor = User::factory()->create(['name' => 'Tutora de búsqueda', 'role' => 'tutor', 'matricula' => 'BUSQ_001']);
+        User::factory()->count(21)->create(['role' => 'interno']);
+
+        $this->actingAs($this->user('admin'))
+            ->get(route('management', 'usuarios'))
+            ->assertOk()
+            ->assertDontSee($tutor->name);
+
+        $this->get(route('management', ['resource' => 'usuarios', 'buscar' => 'tutora de búsqueda']))
+            ->assertOk()
+            ->assertSee($tutor->name)
+            ->assertSee('1 registro');
+
+        $this->get(route('management', ['resource' => 'tutores', 'buscar' => 'busq_001']))
+            ->assertOk()
+            ->assertSee($tutor->name);
+
+        $this->actingAs($this->user('coordinador'))
+            ->get(route('management', ['resource' => 'internos', 'buscar' => $tutor->email]))
+            ->assertOk()
+            ->assertDontSee($tutor->name)
+            ->assertSee('No se encontraron cuentas.');
+    }
+
     public function test_new_accounts_need_password_and_coordination_approval_except_administrators(): void
     {
         $this->seed();

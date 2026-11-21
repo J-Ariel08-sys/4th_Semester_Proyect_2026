@@ -23,7 +23,8 @@
             @foreach(config('navigation.'.auth()->user()->role, []) as $group => $links)
                 @php
                     $matches = fn ($link) => request()->routeIs($link[1], $link[1].'.*')
-                        && (!isset($link[2]) || request()->route('resource') === $link[2]);
+                        && (!isset($link[2]) || request()->route('resource') === $link[2])
+                        && ($link[1] !== 'audit' || request()->boolean('access') === isset($link[3]));
                     $active = collect($links)->contains($matches);
                 @endphp
                 @if(count($links) === 1)
@@ -32,7 +33,7 @@
                     <details class="nav-group" name="navigation-section" @if($active) open @endif>
                         <summary>{{ $group }}</summary>
                         @foreach($links as $link)
-                            <a href="{{ route($link[1], $link[2] ?? []) }}{{ $link[3] ?? '' }}" @if($matches($link) && !isset($link[3])) aria-current="page" @endif>{{ $link[0] }}</a>
+                            <a href="{{ route($link[1], $link[2] ?? []) }}{{ $link[3] ?? '' }}" @if($matches($link)) aria-current="page" @endif>{{ $link[0] }}</a>
                         @endforeach
                     </details>
                 @endif
@@ -44,7 +45,6 @@
     <div class="workspace">
         <header class="topbar">
             <button type="button" class="nav-toggle button secondary" aria-label="Menú de navegación" aria-controls="navigation" aria-expanded="false">Menú</button>
-            <span class="page-context">{{ $title ?? 'Panel' }}</span>
             <div class="account">
                 <button type="button" class="button secondary theme-toggle" data-theme-toggle aria-pressed="false">Modo oscuro</button>
                 <a href="{{ route('dashboard') }}#notificaciones" aria-label="Notificaciones">Avisos</a>
@@ -64,7 +64,6 @@
 {{ $slot }}
         </main>
 @auth
-        <footer>SICLIN · Unifranz — Sede La Paz <span>Gestión académica del internado</span></footer>
     </div></div>
 @else
     </div>

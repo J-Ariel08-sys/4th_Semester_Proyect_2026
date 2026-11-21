@@ -24,19 +24,19 @@ class PortalController extends Controller
         ];
         $actions = match (auth()->user()->role) {
             'coordinador' => [
-                ['Postulación y rotes', 'rotations', 'Revisa postulaciones, calcula una propuesta y publica las asignaciones.'],
-                ['Escenarios y decisiones', 'scenarios', 'Compara políticas antes de elegir cómo distribuir los cupos.'],
-                ['Seguimiento clínico', 'clinical', 'Consulta asistencia y evaluaciones; resuelve solicitudes.'],
+                ['Postulación y rotes', 'rotations', 'Revisar y publicar asignaciones.'],
+                ['Escenarios', 'scenarios', 'Comparar políticas de asignación.'],
+                ['Seguimiento clínico', 'clinical', 'Revisar evaluaciones e incidencias.'],
             ],
             'tutor' => [
-                ['Mis internos', 'clinical', 'Registra asistencia, evalúa competencias y confirma guardias realizadas.'],
-                ['Disponibilidad y guardias', 'shifts', 'Indica cuándo puedes supervisar y consulta tu calendario.'],
-                ['Mis reportes', 'reports', 'Genera la libreta de los internos bajo tu supervisión.'],
+                ['Mis internos', 'clinical', 'Registrar asistencia y notas.'],
+                ['Disponibilidad y guardias', 'shifts', 'Indicar disponibilidad y ver turnos.'],
+                ['Mis reportes', 'reports', 'Descargar libretas.'],
             ],
             default => [
-                ['Oferta y postulación', 'rotations', 'Ordena tus preferencias y conserva tu comprobante.'],
-                ['Mis rotes y solicitudes', 'clinical', 'Consulta tu seguimiento y registra una solicitud.'],
-                ['Mi libreta y documentos', 'reports', 'Revisa tus resultados y descarga tus documentos.'],
+                ['Postulaciones', 'rotations', 'Elegir plazas y ver comprobantes.'],
+                ['Mis rotes y solicitudes', 'clinical', 'Ver tu seguimiento o enviar una solicitud.'],
+                ['Mi libreta', 'reports', 'Consultar resultados y descargar documentos.'],
             ],
         };
 

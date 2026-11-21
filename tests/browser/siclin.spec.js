@@ -41,6 +41,7 @@ test('activación y recuperación OTP por SMTP real de Mailpit, sesiones y consu
   const account = { email: `otp.${Date.now()}@siclin.test`, password: `Initial-${crypto.randomBytes(10).toString('hex')}` };
   await login(page, credentials('admin'));
   await page.goto('/gestion/usuarios');
+  await page.getByRole('link', { name: 'Nueva cuenta' }).click();
   const create = page.locator('form[action$="/gestion/usuarios"]');
   await create.locator('[name=name]').fill('Cuenta OTP de prueba');
   await create.locator('[name=email]').fill(account.email);
