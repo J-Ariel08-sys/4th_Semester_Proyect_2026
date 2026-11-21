@@ -19,6 +19,9 @@ class RotationController extends Controller
     public function index(): View
     {
         $cycles = DB::table('cycles')->whereNull('cycles.deleted_at')->join('specialties', 'specialties.id', '=', 'cycles.specialty_id')->select('cycles.*', 'specialties.name as specialty')->orderByDesc('cycles.id')->get();
+        $today = now()->toDateString();
+        $upcomingCycles = $cycles->where('starts_on', '>=', $today)->sortBy('starts_on');
+        $pastCycles = $cycles->where('starts_on', '<', $today);
         $places = DB::table('places')->whereNull('places.deleted_at')->join('hospitals', 'hospitals.id', '=', 'places.hospital_id')->select('places.*', 'hospitals.name as hospital')->get()->groupBy('cycle_id');
         $applications = DB::table('applications')->where('user_id', auth()->id())->get()->keyBy('cycle_id');
         $runs = (auth()->user()->managesAcademics()) ? DB::table('optimization_runs')->orderByDesc('id')->limit(30)->get() : collect();
@@ -29,7 +32,7 @@ class RotationController extends Controller
 
         $received = auth()->user()->managesAcademics() ? DB::table('applications')->join('users', 'users.id', '=', 'applications.user_id')->select('applications.*', 'users.name')->orderByDesc('applications.id')->get() : collect();
 
-        return view('rotations', compact('received', 'cycles', 'places', 'applications', 'runs', 'studies', 'internNames', 'placeNames'));
+        return view('rotations', compact('received', 'cycles', 'upcomingCycles', 'pastCycles', 'places', 'applications', 'runs', 'studies', 'internNames', 'placeNames'));
     }
 
     public function apply(Request $request, int $cycle): RedirectResponse
@@ -40,7 +43,7 @@ class RotationController extends Controller
             $user = DB::table('users')->where('id', auth()->id())->lockForUpdate()->first();
             $row = DB::table('cycles')->whereNull('deleted_at')->where('id', $cycle)->lockForUpdate()->first();
             abort_unless($row, 404);
-            if (($row->cohort_id && ($row->cohort_id !== $user->cohort_id || ! DB::table('cohorts')->where('id', $row->cohort_id)->whereNull('deleted_at')->where('active', true)->exists())) || ! $user->eligible || ! $user->active || $row->status !== 'abierta' || now()->lt($row->opens_at) || now()->gte($row->closes_at)) {
+            if (($row->cohort_id && ($row->cohort_id !== $user->cohort_id || ! DB::table('cohorts')->where('id', $row->cohort_id)->whereNull('deleted_at')->where('active', true)->exists())) || ! $user->eligible || ! $user->active || $row->status !== 'abierta' || now()->lt($row->opens_at) || now()->gte($row->closes_at) || now()->gte($row->starts_on)) {
                 throw ValidationException::withMessages(['preferences' => 'No estás habilitado o la postulación está cerrada.']);
             }
             if (! $preferences || DB::table('places')->whereNull('deleted_at')->where('cycle_id', $cycle)->whereIn('id', $preferences)->count() !== count($preferences)) {

@@ -115,6 +115,44 @@ class SiclinWorkflowTest extends TestCase
         $this->get(route('audit'))->assertForbidden();
     }
 
+    public function test_rotations_lists_today_and_future_and_blocks_past_applications(): void
+    {
+        $this->seed();
+        $this->applyAndClose();
+        $past = DB::table('cycles')->first();
+        DB::table('cycles')->where('id', $past->id)->update([
+            'name' => 'Convocatoria pasada',
+            'status' => 'abierta',
+            'starts_on' => now()->subDay()->toDateString(),
+            'opens_at' => now()->subDays(2),
+            'closes_at' => now()->addDay(),
+        ]);
+        foreach (['Convocatoria de hoy' => now(), 'Convocatoria futura' => now()->addDay()] as $name => $date) {
+            DB::table('cycles')->insert([
+                'name' => $name,
+                'specialty_id' => $past->specialty_id,
+                'starts_on' => $date->toDateString(),
+                'ends_on' => $date->toDateString(),
+                'opens_at' => now()->subDays(2),
+                'closes_at' => now()->subDay(),
+                'status' => 'abierta',
+            ]);
+        }
+
+        $this->actingAs($this->user('interno2'))->get(route('rotations'))
+            ->assertOk()->assertSeeInOrder(['Convocatoria de hoy', 'Convocatoria futura'])
+            ->assertDontSee('Convocatoria pasada')->assertDontSee('Registrar mis preferencias');
+        $place = DB::table('places')->where('cycle_id', $past->id)->value('id');
+        $this->post(route('applications.store', $past->id), ['preferences' => [$place]])
+            ->assertSessionHasErrors('preferences');
+        $this->assertDatabaseCount('applications', 1);
+
+        $receipt = DB::table('applications')->where('cycle_id', $past->id)->value('receipt');
+        $this->actingAs($this->user('interno'))->get(route('rotations'))->assertOk()
+            ->assertSee('Comprobantes anteriores')->assertSee(route('applications.receipt', $receipt))
+            ->assertDontSee('data-cycle-id="'.$past->id.'"', false);
+    }
+
     public function test_management_validates_capacity_and_escapes_names(): void
     {
         $this->seed();
