@@ -162,23 +162,23 @@ test('postulación, cálculo PHP en cola, revisión, publicación y documentos c
   const guest=await browser.newContext();const guestPage=await guest.newPage();
   await guestPage.goto(verification);
   await expect(guestPage.getByRole('heading',{name:'Documento registrado e íntegro'})).toBeVisible();
-  await expect(guestPage.locator('body')).not.toContainText('Ana Demo');
+  await expect(guestPage.locator('body')).not.toContainText('Ana López');
   await guest.close();
   await logout(page);
   await login(page,credentials('interno'));
   await page.goto('/seguimiento');
-  await expect(page.locator('main')).toContainText('Ana Demo');
-  await expect(page.locator('main')).not.toContainText('Diego Demo');
+  await expect(page.locator('main')).toContainText('Ana López');
+  await expect(page.locator('main')).not.toContainText('Diego Martínez');
   expect((await page.request.get(downloadUrl)).status()).toBe(403);
   const csv=await page.request.get('/reportes/csv');
-  expect(await csv.text()).toContain('Ana Demo');
-  expect(await csv.text()).not.toContain('Diego Demo');
+  expect(await csv.text()).toContain('Ana López');
+  expect(await csv.text()).not.toContain('Diego Martínez');
 });
 
 test('tutor registra asistencia, rúbrica y guardia realizada; libreta PDF propia', async ({ page }) => {
   await login(page,credentials('tutor'));
   await page.goto('/seguimiento');
-  const clinical=page.locator('section.card').filter({hasText:'Camila Clínica Demo'}).first();
+  const clinical=page.locator('section.card').filter({hasText:'Camila Rojas'}).first();
   const record=clinical.locator('details').filter({has:page.locator('form[action$="/registro"]')});
   await record.locator('summary').click();
   await record.locator('[name=date]').fill(new Intl.DateTimeFormat('en-CA',{timeZone:'America/La_Paz',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
