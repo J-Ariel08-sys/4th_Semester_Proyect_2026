@@ -82,6 +82,21 @@ class SiclinWorkflowTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_audit_shows_descriptions_without_access_hashes_or_document_tokens(): void
+    {
+        $this->seed();
+        DB::table('audit_logs')->insert([
+            ['created_at' => now(), 'action' => 'sesion.fallida', 'details' => json_encode(['identificador' => 'hash-de-prueba'])],
+            ['created_at' => now(), 'action' => 'acta.emitida', 'details' => json_encode(['token' => 'token-de-prueba'])],
+            ['created_at' => now(), 'action' => 'gestion.eliminada', 'details' => json_encode(['recurso' => 'hospitales', 'motivo' => 'Convenio finalizado', 'registro' => ['nombre' => 'registro-interno-prueba']])],
+        ]);
+
+        $this->actingAs($this->user('admin'))->get(route('audit'))->assertOk()
+            ->assertSee('Intento de inicio de sesión fallido')->assertSee('Acta PDF emitida')
+            ->assertSee('Motivo: Convenio finalizado')->assertDontSee('hash-de-prueba')
+            ->assertDontSee('token-de-prueba')->assertDontSee('registro-interno-prueba');
+    }
+
     public function test_login_locks_after_five_failures_and_password_reset_revokes_sessions(): void
     {
         $this->seed();
