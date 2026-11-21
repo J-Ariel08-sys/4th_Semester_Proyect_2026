@@ -6,8 +6,10 @@ use App\Models\User;
 use App\Notifications\AssignmentPublished;
 use App\Services\DecisionAnalysis;
 use App\Services\RotationOptimizer;
+use App\Services\XlsxRows;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -265,6 +267,38 @@ class SiclinWorkflowTest extends TestCase
         $this->assertSame(['A1', 'A2', 'A3'], $ties['winners']['savage']);
         $this->actingAs($this->user('coordinador'))->post(route('scenarios.store'), ['name' => 'Estudio prueba', 'alpha' => 0.5, 'matrix' => ['A1' => [3, 2, 1], 'A2' => [2, 2, 2], 'A3' => [1, 2, 3]]])->assertSessionHasNoErrors();
         $this->assertDatabaseCount('scenario_studies', 2);
+    }
+
+    public function test_scenario_excel_import_calculates_and_exports_results(): void
+    {
+        $this->seed();
+        $this->actingAs($this->user('coordinador'));
+        $template = $this->get(route('scenarios.template'))->assertOk()->assertDownload('SICLIN-plantilla-escenarios.xlsx');
+        $data = [
+            'name' => 'Cupos estimados por Coordinación',
+            'source' => 'Proyección de prueba',
+            'alpha' => '0.5',
+            'orientation' => 'benefits',
+        ];
+        $this->post(route('scenarios.import'), $data + ['file' => UploadedFile::fake()->createWithContent('escenarios.xlsx', 'archivo inválido')])
+            ->assertSessionHasErrors('file');
+        $this->assertDatabaseCount('scenario_studies', 1);
+
+        $this->post(route('scenarios.import'), $data + ['file' => UploadedFile::fake()->createWithContent('escenarios.xlsx', $template->getContent())])
+            ->assertSessionHasNoErrors();
+        $study = DB::table('scenario_studies')->where('name', $data['name'])->first();
+        $result = json_decode($study->result, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['A3'], $result['winners']['maximin']);
+        $this->assertSame($data['source'], $result['source']);
+
+        $pdf = $this->get(route('scenarios.export', [$study->id, 'pdf']))->assertOk()->assertDownload('SICLIN-escenario-'.$study->id.'.pdf');
+        $this->assertStringStartsWith('%PDF-', $pdf->getContent());
+        $xlsx = $this->get(route('scenarios.export', [$study->id, 'xlsx']))->assertOk()->assertDownload('SICLIN-escenario-'.$study->id.'.xlsx');
+        $file = UploadedFile::fake()->createWithContent('resultados.xlsx', $xlsx->getContent());
+        $rows = app(XlsxRows::class)->read($file->getRealPath(), 6, 40);
+        $this->assertContains(['Criterios de decisión', '', '', '', '', ''], $rows);
+
+        $this->actingAs($this->user('interno'))->get(route('scenarios.export', [$study->id, 'pdf']))->assertForbidden();
     }
 
     public function test_pdf_contains_snapshot_and_verification_does_not_expose_intern_names(): void

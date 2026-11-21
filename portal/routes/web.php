@@ -83,6 +83,9 @@ Route::middleware(['auth', 'role:administrador,coordinador,tutor,interno'])->gro
         Route::get('/guardias/lotes/{batch}/estado', [ShiftController::class, 'status'])->middleware('role:coordinador')->name('shifts.status');
         Route::get('/escenarios', [ScenarioController::class, 'index'])->name('scenarios');
         Route::post('/escenarios/simular', [ScenarioController::class, 'simulate'])->middleware('throttle:3,1,scenario-simulate:')->name('scenarios.simulate');
+        Route::get('/escenarios/plantilla', [ScenarioController::class, 'template'])->name('scenarios.template');
+        Route::post('/escenarios/importar', [ScenarioController::class, 'import'])->name('scenarios.import');
+        Route::get('/escenarios/{study}/exportar/{format}', [ScenarioController::class, 'export'])->where('format', 'xlsx|pdf')->name('scenarios.export');
         Route::post('/escenarios', [ScenarioController::class, 'store'])->name('scenarios.store');
         Route::post('/escenarios/{study}/elegir', [ScenarioController::class, 'choose'])->name('scenarios.choose');
         Route::post('/guardias/generar', [ShiftController::class, 'generate'])->name('shifts.generate');

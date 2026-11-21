@@ -6,6 +6,8 @@ use App\Jobs\ComputeScenario;
 use App\Services\Audit;
 use App\Services\DecisionAnalysis;
 use App\Services\RotationService;
+use App\Services\ScenarioWorkbook;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class ScenarioController extends Controller
 {
@@ -28,14 +31,61 @@ class ScenarioController extends Controller
         if (! is_array($matrix)) {
             throw ValidationException::withMessages(['matrix' => 'Se requiere un objeto de alternativas y escenarios.']);
         }
-        $result = $analysis->calculate($matrix, (float) $data['alpha'], $data['orientation'] ?? 'benefits');
-        $result['source'] = 'Ejercicio ingresado por Coordinación; no es evidencia institucional.';
-        DB::transaction(function () use ($data, $matrix, $result) {
-            $id = DB::table('scenario_studies')->insertGetId(['name' => $data['name'], 'alpha' => $data['alpha'], 'matrix' => json_encode($matrix), 'result' => json_encode($result), 'created_by' => auth()->id(), 'created_at' => now(), 'updated_at' => now()]);
-            Audit::record('escenario.calculado', ['id' => $id]);
-        });
+        $this->calculate($data, $matrix, $analysis, 'Ejercicio ingresado por Coordinación.');
 
         return back()->with('status', 'Análisis y sensibilidad calculados.');
+    }
+
+    public function import(Request $request, ScenarioWorkbook $workbook, DecisionAnalysis $analysis): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:150',
+            'source' => 'required|string|max:500',
+            'alpha' => 'required|numeric|between:0,1',
+            'orientation' => ['required', Rule::in(['benefits', 'costs'])],
+            'file' => 'required|file|extensions:xlsx|max:2048',
+        ]);
+        $id = $this->calculate($data, $workbook->matrix($request->file('file')->getRealPath()), $analysis, $data['source']);
+
+        return redirect()->to(route('scenarios').'#estudio-'.$id)->with('status', 'Excel importado. Los criterios ya están calculados.');
+    }
+
+    public function template(ScenarioWorkbook $workbook): Response
+    {
+        return $this->spreadsheet($workbook->template(), 'SICLIN-plantilla-escenarios.xlsx');
+    }
+
+    public function export(int $study, string $format, ScenarioWorkbook $workbook): Response
+    {
+        $row = DB::table('scenario_studies')->where('execution_status', 'completada')->find($study);
+        abort_unless($row, 404);
+        $sections = $workbook->results($row, json_decode($row->result, true));
+        $filename = 'SICLIN-escenario-'.$study;
+
+        if ($format === 'pdf') {
+            return Pdf::loadView('scenario-pdf', ['sections' => $sections])->setPaper('a4', 'landscape')->download($filename.'.pdf');
+        }
+
+        return $this->spreadsheet($workbook->export($sections), $filename.'.xlsx');
+    }
+
+    private function spreadsheet(string $content, string $filename): Response
+    {
+        return response($content)->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
+    }
+
+    private function calculate(array $data, array $matrix, DecisionAnalysis $analysis, string $source): int
+    {
+        $result = $analysis->calculate($matrix, (float) $data['alpha'], $data['orientation'] ?? 'benefits');
+        $result['source'] = $source;
+
+        return DB::transaction(function () use ($data, $matrix, $result) {
+            $id = DB::table('scenario_studies')->insertGetId(['name' => $data['name'], 'alpha' => $data['alpha'], 'matrix' => json_encode($matrix), 'result' => json_encode($result), 'created_by' => auth()->id(), 'created_at' => now(), 'updated_at' => now()]);
+            Audit::record('escenario.calculado', ['id' => $id]);
+
+            return $id;
+        });
     }
 
     public function choose(Request $request, int $study): RedirectResponse
