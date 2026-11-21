@@ -2,6 +2,21 @@
 
 Portal de internado de Medicina con **Laravel 13 / PHP 8.5**, PostgreSQL 16, Blade, CSS/JavaScript compilados con Vite, Nginx, Docker y Mailpit. La optimización de rotes y guardias se ejecuta en PHP mediante colas Laravel. Quarkus no participa en el arranque ni en el cálculo; `optimizer-quarkus/` se conserva como código histórico.
 
+## Instancia de trabajo
+
+Con Docker y Python 3 instalados, ejecuta `INICIAR.bat` en Windows con Docker Desktop abierto o `./scripts/dev-up.sh` desde Linux o macOS.
+
+El portal abre en http://localhost:8000 y el buzón local en http://localhost:8025. El inicio migra la base, conserva sus registros y deja la creación de usuarios a Administración. Después de modificar el código, vuelve a ejecutar el iniciador para reconstruir las imágenes.
+
+En una base nueva, crea el primer administrador desde una terminal en la raíz. Reemplaza el correo de ejemplo por el tuyo.
+
+```text
+docker compose exec -T app php artisan siclin:admin admin@example.com --no-interaction
+docker compose exec app cat /app/storage/app/private/bootstrap-admin.json
+```
+
+Abre el portal con las credenciales generadas. Guarda la contraseña en privado y elimina el archivo de arranque del contenedor cuando hayas iniciado sesión correctamente. Mailpit permite consultar los correos de activación y recuperación en el entorno local.
+
 ## Preparar una presentación
 
 Requisitos: Docker Engine, Docker Compose y Python 3. Desde la raíz del repositorio:
@@ -35,17 +50,6 @@ La demo tiene base, volúmenes, correo y cookie propios. El arranque normal cons
 ```
 
 Este comando **reinicia solo la base de demo** después de guardar su copia en `.local/demo-backups/`; genera nuevas contraseñas. Vuelve a consultar el archivo de cuentas. No reinicia la instancia de trabajo del puerto 8000. La copia es de la base de datos; no es un respaldo completo de los PDF privados.
-
-## Instancia de trabajo
-
-```bash
-./scripts/dev-up.sh
-cat .local/demo-accounts.json
-```
-
-Portal http://localhost:8000 y correo local http://localhost:8025. Migra sin borrar datos; carga cuentas iniciales solo cuando no existen usuarios. Las imágenes incluyen código y assets: después de editar el proyecto, vuelve a ejecutar el script para reconstruirlas. No hace falta instalar PHP, Composer o Node en el equipo para arrancar mediante Docker.
-
-Para agregar tu correo institucional y probar activación/recuperación, sigue [la guía OTP](docs/PRUEBA_CORREO_OTP.md). Mailpit recibe SMTP local; la entrega a una bandeja externa requiere credenciales del proveedor y aún debe validarse con ellas. La instancia de demo fuerza correo local aunque configures SMTP externo en la instancia de trabajo.
 
 ## Pruebas
 
