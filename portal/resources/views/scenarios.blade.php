@@ -1,4 +1,4 @@
-<x-layout title="Análisis de escenarios"><div class="page-heading"><div><p class="eyebrow">MÓDULO 06 · INVESTIGACIÓN OPERATIVA</p><h1>Decidir con escenarios</h1><p>Compara políticas frente a la incertidumbre y deja registrada tu decisión.</p></div></div>
+<x-layout title="Análisis de escenarios"><div class="page-heading"><div><h1>Escenarios</h1></div></div>
 <section class="card">
     <h2>Calcular desde Excel</h2>
     <p>Descarga la plantilla y reemplaza los valores de las tres políticas. El sistema calcula los criterios y la sensibilidad al importar.</p>

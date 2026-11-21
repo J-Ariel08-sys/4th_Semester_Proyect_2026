@@ -64,6 +64,7 @@ test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar c
   const account = { email: `habilitacion.${stamp}@siclin.test`, password: 'ClaveInicialDemo2026!' };
   await login(page, accountFor('admin'));
   await page.goto('/gestion/cohortes');
+  await page.getByRole('link', { name: 'Nuevo registro' }).click();
   const cohort = page.locator('form[action$="/gestion/cohortes"]');
   await cohort.locator('[name=name]').fill(`Cohorte de acceso ${stamp}`);
   await cohort.locator('[name=entry_year]').fill('2026');
@@ -71,6 +72,9 @@ test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar c
   await expect(page.getByRole('status')).toContainText('guardado');
   await page.goto('/gestion/usuarios');
   await expect(page.locator('main')).not.toContainText('Importar nómina');
+  await expect(page.getByRole('link', { name: 'Nueva cuenta' })).toBeVisible();
+  await expect(page.locator('#editor')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Nueva cuenta' }).click();
   const create = page.locator('form[action$="/gestion/usuarios"]');
   await create.locator('[name=name]').fill('Interno de habilitación en navegador');
   await create.locator('[name=email]').fill(account.email);
@@ -79,6 +83,10 @@ test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar c
   await create.locator('[name=password_confirmation]').fill(account.password);
   await create.getByRole('button', { name: 'Guardar registro' }).click();
   await expect(page.getByRole('status')).toContainText('guardado');
+  await page.getByRole('searchbox', { name: 'Buscar cuentas' }).fill(account.email);
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('tbody tr')).toContainText(account.email);
   await logout(page);
   await page.locator('[name=email]').fill(account.email);
   await page.locator('[name=password]').fill(account.password);
@@ -125,6 +133,7 @@ test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar c
   await page.goto('/gestion/usuarios');
   await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Editar', exact: true }).click();
   const reason = `Cuenta temporal ${stamp} retirada al terminar la prueba de navegador.`;
+  await page.getByText('Eliminar registro', { exact: true }).first().click();
   await page.locator('[name=reason]').fill(reason);
   await page.getByRole('button', { name: 'Eliminar registro', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Registro eliminado');

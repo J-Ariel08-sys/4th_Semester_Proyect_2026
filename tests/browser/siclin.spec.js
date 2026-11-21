@@ -41,6 +41,7 @@ test('activación y recuperación OTP por SMTP real de Mailpit, sesiones y consu
   const account = { email: `otp.${Date.now()}@siclin.test`, password: `Initial-${crypto.randomBytes(10).toString('hex')}` };
   await login(page, credentials('admin'));
   await page.goto('/gestion/usuarios');
+  await page.getByRole('link', { name: 'Nueva cuenta' }).click();
   const create = page.locator('form[action$="/gestion/usuarios"]');
   await create.locator('[name=name]').fill('Cuenta OTP de prueba');
   await create.locator('[name=email]').fill(account.email);
@@ -100,19 +101,27 @@ test('activación y recuperación OTP por SMTP real de Mailpit, sesiones y consu
 });
 
 test('menús por rol y navegación responsive a 320, 390, 768 y 1280 px', async ({ browser }) => {
-  for (const [user, menu] of [['admin','Usuarios y permisos'],['coordinador','Gestión académica y hospitalaria'],['interno','Mi perfil académico'],['tutor','Mis internos']]) {
+  const menusByRole = [
+    ['admin', 'Usuarios y permisos'],
+    ['coordinador', 'Registro'],
+    ['interno', 'Postulaciones'],
+    ['tutor', 'Mis internos'],
+  ];
+  for (const [user, menu] of menusByRole) {
     const context = await browser.newContext();
     const page = await context.newPage();
     await login(page, credentials(user));
+    const navigation = page.locator('#navigation');
+    const menuItem = navigation.getByText(menu, { exact: true });
     for (const width of [320,390,768,1280]) {
       await page.setViewportSize({ width, height: 900 });
       if (width <= 768) {
         await page.getByRole('button',{ name:'Menú de navegación' }).click();
-        await expect(page.locator('#navigation')).toBeVisible();
-        await expect(page.getByText(menu,{exact:true}).first()).toBeVisible();
+        await expect(navigation).toBeVisible();
+        await expect(menuItem).toBeVisible();
         await page.keyboard.press('Escape');
-        await expect(page.locator('#navigation')).toBeHidden();
-      } else await expect(page.getByText(menu,{exact:true}).first()).toBeVisible();
+        await expect(navigation).toBeHidden();
+      } else await expect(menuItem).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     }
     if (user === 'admin') expect((await page.goto('/seguimiento')).status()).toBe(200);

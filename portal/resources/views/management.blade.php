@@ -1,29 +1,22 @@
-<x-layout :title="$definition['title']">
-    <div class="page-heading"><div><p class="eyebrow">CONFIGURACIÓN DEL INTERNADO</p><h1>{{ $definition['title'] }}</h1><p>Administra los datos y las autorizaciones de acceso.</p></div></div>
-    <div class="tabs">
-        @foreach(\App\Http\Controllers\ManagementController::definitions() as $key => $def)
-            @if(auth()->user()->isAdministrator() || $key !== 'usuarios')
-                <a class="{{ $resource === $key ? 'active' : '' }}" href="{{ route('management', $key) }}">{{ $def['title'] }}</a>
-            @endif
-        @endforeach
+@php
+    $canCreate = !in_array($resource, ['internos', 'tutores', 'habilitaciones'], true);
+    $createLabel = $resource === 'usuarios' ? 'Nueva cuenta' : 'Nuevo registro';
+    $showEditor = $edit || ($canCreate && request()->boolean('nuevo'));
+    $title = $showEditor ? ($edit ? ($definition['table'] === 'users' ? 'Editar cuenta' : 'Editar registro') : $createLabel) : $definition['title'];
+    $tableFields = array_diff_key($definition['fields'], $resource === 'usuarios' ? ['name' => true, 'active' => true] : ['name' => true]);
+    $columnCount = count($tableFields) + (in_array($resource, ['usuarios', 'internos'], true) ? 3 : 2);
+@endphp
+<x-layout :title="$title">
+    <div class="page-heading">
+        <h1>{{ $title }}</h1>
+        @if(!$showEditor && $canCreate)
+            <a class="button" href="{{ route('management', ['resource' => $resource, 'nuevo' => 1]) }}">{{ $createLabel }}</a>
+        @endif
     </div>
-    @if(in_array($resource, ['usuarios', 'habilitaciones', 'internos']))
-        <section class="card">
-            <h2>Crear, completar y habilitar</h2>
-            <p>Administración crea la cuenta con su correo, rol y contraseña. Coordinación completa los datos del interno y autoriza su ingreso; para tutores y coordinadores utiliza Habilitación de cuentas. Los administradores pueden realizar ambos pasos.</p>
-            @if($resource === 'usuarios')
-                <p class="help">Si dejas vacía la contraseña inicial, se enviará un código de activación por correo. Definir o recuperar una contraseña no reemplaza la habilitación de Coordinación.</p>
-            @elseif(! $edit)
-                <p class="help">Selecciona «Completar datos» en la cuenta que vas a habilitar. Las cuentas pendientes pueden tener contraseña y seguir bloqueadas para el ingreso.</p>
-            @endif
-        </section>
-    @endif
-    @if($edit || ! in_array($resource, ['internos', 'tutores', 'habilitaciones']))
+    @if($showEditor)
         <section class="card" id="editor">
-            <h2>{{ $edit ? 'Editar registro #'.$edit->id : 'Nuevo registro' }}</h2>
             @if($edit && $definition['table'] === 'users')
                 <p class="record-name">{{ $edit->name }} · {{ $edit->email }} · {{ ucfirst($edit->role) }}</p>
-                <p class="help">Contraseña: {{ $edit->activated_at ? 'definida' : 'pendiente' }}. Acceso: {{ $edit->role === 'administrador' || ($edit->access_approved_at && ($edit->role !== 'interno' || $edit->eligible)) ? 'autorizado' : 'pendiente de Coordinación' }}. Cuenta: {{ $edit->active ? 'activa' : 'inactiva' }}.</p>
             @endif
             <form method="post" action="{{ route('management.save', [$resource, $edit?->id]) }}">
                 @csrf
@@ -43,43 +36,62 @@
                     @if($resource === 'usuarios')
                         <x-password-field :label="$edit ? 'Nueva contraseña (opcional)' : 'Contraseña inicial (opcional)'" minlength="12" />
                         <x-password-field name="password_confirmation" label="Confirmar contraseña" minlength="12" />
-                        <p class="help full">Usa al menos 12 caracteres con letras y números. En una edición, deja ambos campos vacíos para conservar la clave. Cambiar la clave cierra las sesiones anteriores. Si cambias el correo, define una nueva contraseña o activa el acceso por correo.</p>
+                        <p class="help full">{{ $edit
+                            ? 'Usa 12 caracteres o más, con letras y números. Deja los campos vacíos para conservar la clave.'
+                            : 'Usa 12 caracteres o más, con letras y números. Si dejas la clave vacía, la cuenta se activará por correo.' }}</p>
                     @endif
                     @if($resource === 'internos')
                         <label>Teléfono de contacto<input name="phone" maxlength="40" value="{{ old('phone', $edit?->phone) }}"></label>
-                        <p class="help full">Completa cohorte, matrícula, promedio y méritos. Marca «Habilitado académicamente» para autorizar el ingreso y la postulación. La cuenta también debe estar activa y tener contraseña.</p>
+                        <p class="help full">Marca «Habilitado académicamente» para autorizar el ingreso y la postulación.</p>
                     @endif
                 </div>
-                <div class="form-actions"><button>Guardar registro</button>@if($edit)<a href="{{ route('management', $resource) }}">Cancelar edición</a>@endif</div>
+                <div class="form-actions">
+                    <button>Guardar registro</button>
+                    <a class="button secondary" href="{{ route('management', $resource) }}">Cancelar</a>
+                </div>
             </form>
             @if($edit)
-                <form method="post" action="{{ route('management.destroy', [$resource, $edit->id]) }}" class="deletion-form" data-confirm="¿Eliminar este registro? Se retirará de la gestión y la acción quedará registrada en bitácora.">
-                    @csrf @method('DELETE')
-                    <h3>Eliminar registro</h3>
-                    <p class="help">La eliminación retira el registro de los listados de gestión. Se conservan los datos vinculados a rotes, seguimiento y documentos para mantener el historial. Eliminar una cuenta también bloquea su ingreso.</p>
-                    <label>Motivo de eliminación<textarea name="reason" minlength="10" maxlength="1000" required placeholder="Indica por qué debe eliminarse este registro"></textarea></label>
-                    <div class="form-actions"><button class="button danger">Eliminar registro</button></div>
-                </form>
+                <details class="deletion-form" @if($errors->hasAny(['reason', 'eliminar'])) open @endif>
+                    <summary>Eliminar registro</summary>
+                    <form method="post" action="{{ route('management.destroy', [$resource, $edit->id]) }}" data-confirm="¿Eliminar este registro?">
+                        @csrf @method('DELETE')
+                        <p class="help">El historial se conserva. @if($definition['table'] === 'users') La cuenta perderá el acceso al portal. @endif</p>
+                        <label>Motivo<textarea name="reason" minlength="10" maxlength="1000" required>{{ old('reason') }}</textarea></label>
+                        <div class="form-actions"><button class="button danger">Eliminar registro</button></div>
+                    </form>
+                </details>
             @endif
         </section>
+    @else
+        <section class="card">
+            @if($definition['table'] === 'users')
+                <form class="record-search" method="get" action="{{ route('management', $resource) }}" role="search">
+                    <label>Buscar cuentas
+                        <input type="search" name="buscar" maxlength="120" value="{{ $search }}" placeholder="Nombre, correo o matrícula">
+                    </label>
+                    <button class="button secondary">Buscar</button>
+                    @if($search !== '')
+                        <a href="{{ route('management', $resource) }}">Limpiar</a>
+                    @endif
+                </form>
+            @endif
+            <p class="muted record-count">{{ $rows->total() }} {{ $rows->total() === 1 ? 'registro' : 'registros' }}</p>
+            <div class="table-wrap"><table><thead><tr><th>{{ array_key_exists('name', $definition['fields']) || $definition['table'] === 'users' ? 'Nombre' : 'Registro' }}</th>
+                @foreach($tableFields as $field => $label)<th>{{ $label }}</th>@endforeach
+                @if(in_array($resource, ['usuarios', 'internos']))<th>Acceso al portal</th>@endif
+                <th>Acción</th></tr></thead><tbody>
+                @forelse($rows as $row)
+                    <tr><td>{{ $row->name ?? '#'.$row->id }}@if($resource === 'habilitaciones')<br><small>{{ $row->email }} · {{ $choices['role'][$row->role] }}</small>@endif</td>
+                        @foreach($tableFields as $field => $label)
+                            <td>@if($field === 'access_enabled'){{ $row->access_approved_at && ($row->role !== 'interno' || $row->eligible) ? 'Autorizado' : 'Pendiente' }}@elseif($resource === 'internos' && $field === 'cohort_id'){{ $row->cohort_id ? 'Sí' : 'No' }}@else{{ in_array($field, ['active', 'eligible']) ? ($row->$field ? 'Sí' : 'No') : ($choices[$field][$row->$field] ?? $row->$field) }}@endif</td>
+                        @endforeach
+                        @if(in_array($resource, ['usuarios', 'internos']))<td>{{ ! $row->active ? 'Inactiva' : (! $row->activated_at ? 'Sin contraseña' : ($row->role !== 'administrador' && (! $row->access_approved_at || ($row->role === 'interno' && ! $row->eligible)) ? 'Pendiente de Coordinación' : 'Habilitado')) }}</td>@endif
+                        <td><a href="{{ route('management.edit', [$resource, $row->id]) }}">{{ in_array($resource, ['internos', 'habilitaciones']) ? 'Completar datos' : 'Editar' }}</a>
+                        @if($resource === 'usuarios' && ! $row->activated_at && $row->active)<form method="post" action="{{ route('users.activate', $row->id) }}">@csrf<button class="button small">Enviar activación</button></form>@endif</td>
+                    </tr>
+                @empty<tr><td colspan="{{ $columnCount }}" class="empty">{{ $search === '' ? 'Todavía no hay registros.' : 'No se encontraron cuentas.' }}</td></tr>@endforelse
+            </tbody></table></div>
+            {{ $rows->links() }}
+        </section>
     @endif
-    <section class="card">
-        <div class="card-head"><h2>Registros</h2><span class="badge neutral">{{ $rows->total() }} en total</span></div>
-        <div class="table-wrap"><table><thead><tr><th>ID / nombre</th>
-            @foreach($definition['fields'] as $field => $label)<th>{{ $label }}</th>@endforeach
-            @if(in_array($resource, ['usuarios', 'internos']))<th>Acceso al portal</th>@endif
-            <th>Acción</th></tr></thead><tbody>
-            @forelse($rows as $row)
-                <tr><td>#{{ $row->id }} {{ $row->name ?? '' }}@if($resource === 'habilitaciones')<br><small>{{ $row->email }} · {{ $row->role }}</small>@endif</td>
-                    @foreach($definition['fields'] as $field => $label)
-                        <td>@if($field === 'access_enabled'){{ $row->access_approved_at && ($row->role !== 'interno' || $row->eligible) ? 'Autorizado' : 'Pendiente' }}@elseif($resource === 'internos' && $field === 'cohort_id'){{ $row->cohort_id ? 'Sí' : 'No' }}@else{{ in_array($field, ['active', 'eligible']) ? ($row->$field ? 'Sí' : 'No') : ($choices[$field][$row->$field] ?? $row->$field) }}@endif</td>
-                    @endforeach
-                    @if(in_array($resource, ['usuarios', 'internos']))<td>{{ ! $row->active ? 'Inactiva' : (! $row->activated_at ? 'Sin contraseña' : ($row->role !== 'administrador' && (! $row->access_approved_at || ($row->role === 'interno' && ! $row->eligible)) ? 'Pendiente de Coordinación' : 'Habilitado')) }}</td>@endif
-                    <td><a href="{{ route('management.edit', [$resource, $row->id]) }}">{{ in_array($resource, ['internos', 'habilitaciones']) ? 'Completar datos' : 'Editar' }}</a>
-                    @if($resource === 'usuarios' && ! $row->activated_at && $row->active)<form method="post" action="{{ route('users.activate', $row->id) }}">@csrf<button class="button small">Enviar activación</button></form>@endif</td>
-                </tr>
-            @empty<tr><td colspan="20" class="empty">Todavía no hay registros.</td></tr>@endforelse
-        </tbody></table></div>
-        {{ $rows->links() }}
-    </section>
 </x-layout>

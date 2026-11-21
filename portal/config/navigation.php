@@ -3,27 +3,26 @@
 $navigation = [
     'administrador' => [
         'Usuarios y permisos' => [['Cuentas de usuario', 'management', 'usuarios'], ['Roles y permisos', 'permissions']],
-        'Seguridad y auditoría' => [['Bitácora de acciones', 'audit'], ['Accesos y bloqueos', 'audit', null, '?access=1']],
-        'Configuración general' => [['Configuración general', 'settings']],
+        'Seguridad' => [['Bitácora', 'audit'], ['Accesos y bloqueos', 'audit', null, '?access=1']],
+        'Configuración' => [['Configuración', 'settings']],
     ],
     'coordinador' => [
-        'Gestión académica y hospitalaria' => [['Habilitar cuentas', 'management', 'habilitaciones'], ['Internos y habilitación', 'management', 'internos'], ['Cohortes y trayectoria', 'management', 'cohortes'], ['Requisitos de especialidades', 'management', 'requisitos'], ['Hospitales y convenios', 'management', 'hospitales'], ['Especialidades', 'management', 'especialidades'], ['Cupos hospitalarios', 'management', 'plazas'], ['Periodos y calendario', 'management', 'convocatorias']],
-        'Postulación y rotes' => [['Postulación y rotes', 'rotations']],
-        'Escenarios y decisiones' => [['Escenarios y decisiones', 'scenarios']],
-        'Guardias y tutores' => [['Disponibilidad y calendario', 'shifts'], ['Tutores y límites', 'management', 'tutores']],
-        'Seguimiento clínico' => [['Seguimiento clínico', 'clinical']],
-        'Documentos y reportes' => [['Documentos y reportes', 'reports']],
+        'Registro' => [['Habilitar cuentas', 'management', 'habilitaciones'], ['Internos', 'management', 'internos'], ['Cohortes', 'management', 'cohortes'], ['Requisitos', 'management', 'requisitos'], ['Hospitales', 'management', 'hospitales'], ['Especialidades', 'management', 'especialidades'], ['Cupos', 'management', 'plazas'], ['Convocatorias', 'management', 'convocatorias']],
+        'Rotes' => [['Rotes', 'rotations']],
+        'Escenarios' => [['Escenarios', 'scenarios']],
+        'Guardias y tutores' => [['Calendario de guardias', 'shifts'], ['Tutores', 'management', 'tutores']],
+        'Seguimiento' => [['Seguimiento', 'clinical']],
+        'Reportes' => [['Reportes', 'reports']],
     ],
     'interno' => [
-        'Mi perfil académico' => [['Datos y habilitación', 'account']],
-        'Oferta y postulación' => [['Oferta y postulación', 'rotations']],
+        'Postulaciones' => [['Postulaciones', 'rotations']],
         'Mis rotes y solicitudes' => [['Mis rotes y solicitudes', 'clinical']],
         'Mis guardias' => [['Mis guardias', 'shifts']],
-        'Mi libreta y documentos' => [['Mi libreta y documentos', 'reports']],
+        'Mi libreta' => [['Mi libreta', 'reports']],
     ],
     'tutor' => [
         'Mis internos' => [['Mis internos', 'clinical']],
-        'Disponibilidad y guardias' => [['Disponibilidad y guardias', 'shifts']],
+        'Mis guardias' => [['Mis guardias', 'shifts']],
         'Mis reportes' => [['Mis reportes', 'reports']],
     ],
 ];

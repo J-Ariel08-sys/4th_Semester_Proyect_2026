@@ -1,4 +1,4 @@
-<x-layout title="Guardias y tutores"><div class="page-heading"><div><p class="eyebrow">MÓDULO 07</p><h1>Guardias y carga de tutores</h1><p>Planifica con disponibilidad y descansos; registra el cumplimiento después del turno.</p></div></div>
+<x-layout title="Guardias y tutores"><div class="page-heading"><div><h1>Guardias y tutores</h1></div></div>
 @if(auth()->user()->role!=='interno')<section class="card"><h2>Registrar disponibilidad</h2>
 @if(auth()->user()->isAdministrator())
     <p><a href="{{ route('management', 'usuarios') }}">Crear cuenta de tutor</a> · <a href="{{ route('management', 'habilitaciones') }}">Habilitar acceso</a></p>
