@@ -27,27 +27,31 @@ test.describe.configure({ mode: 'serial' });
 test('demo ampliada: datos visibles, cálculos de escasez, documentos y alcance del interno', async ({ page }) => {
   await login(page, 'coordinador');
   for (const [resource, text] of [
-    ['cohortes', 'DEMO ampliada · A · trayectoria clínica'],
+    ['cohortes', 'Cohorte A · Trayectoria clínica'],
     ['hospitales', 'Centro E · convenio vencido'],
-    ['internos', 'Alex Pendiente Demo'],
+    ['internos', 'Alex Pendiente'],
   ]) {
     await page.goto(`/gestion/${resource}`);
     await expect(page.locator('main')).toContainText(text);
   }
   await page.goto('/rotes');
-  await expect(page.locator('[data-cycle-id]').filter({ hasText: 'DEMO ampliada' })).toHaveCount(7);
+  const upcoming = page.locator('[data-cycle-id]');
+  for (const name of ['Rotes publicados · Ginecología', 'Oferta abierta · Pediatría', 'Propuesta para revisar · Medicina Interna', 'Cupos insuficientes · Salud Pública', 'Preparación · Cirugía']) {
+    await expect(upcoming.getByRole('heading', { name, exact: true })).toBeVisible();
+  }
+  await expect(upcoming.getByRole('heading', { name: 'Archivo · Salud Pública', exact: true })).toHaveCount(0);
   const shortage = page.locator('[data-run-cycle-id]').filter({ hasText: 'Cupos insuficientes' });
   await expect(shortage.locator('.stat').filter({ hasText: 'Asignados' }).locator('strong')).toHaveText('2');
   await expect(shortage.locator('.stat').filter({ hasText: 'Pendientes' }).locator('strong')).toHaveText('2');
   await page.goto('/escenarios');
-  const study = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'DEMO ampliada · Escenarios: Cupos insuficientes · Salud Pública', exact: true }) });
+  const study = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Escenarios: Cupos insuficientes · Salud Pública', exact: true }) });
   await study.getByText('Resultados calculados y sensibilidad de cupos', { exact: true }).click();
   const metrics = study.locator('details').filter({ hasText: 'Resultados calculados y sensibilidad de cupos' }).locator('tbody tr');
   await expect(metrics).toHaveCount(9);
   await expect(metrics.first().locator('td').nth(2)).toHaveText('2');
   await expect(metrics.first().locator('td').nth(3)).toHaveText('2');
   await page.goto('/reportes');
-  const act = page.locator('#documentos tr').filter({ hasText: 'DEMO ampliada · Seguimiento activo' });
+  const act = page.locator('#documentos tr').filter({ hasText: 'Seguimiento activo · Cirugía' });
   await expect(act).toHaveCount(1);
   const actUrl = await act.getByRole('link', { name: 'Descargar PDF' }).getAttribute('href');
   await pdf(page);
@@ -55,16 +59,16 @@ test('demo ampliada: datos visibles, cálculos de escasez, documentos y alcance 
 
   await login(page, 'interno.demo01');
   await page.goto('/seguimiento');
-  await expect(page.locator('main')).toContainText('Sofía Ampliación Demo');
-  await expect(page.locator('main')).not.toContainText('Gabriel Ampliación Demo');
-  const history = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Sofía Ampliación Demo', exact: true }) }).filter({ hasText: 'Cirugía' });
+  await expect(page.locator('main')).toContainText('Sofía Paredes');
+  await expect(page.locator('main')).not.toContainText('Gabriel Mendoza');
+  const history = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Sofía Paredes', exact: true }) }).filter({ hasText: 'Cirugía' });
   await history.getByText('Historial de seguimiento (3)', { exact: true }).click();
   await expect(history.getByRole('cell', { name: 'Presente', exact: true }).first()).toBeVisible();
   await page.goto('/reportes');
   await pdf(page);
   expect((await page.request.get(actUrl)).status()).toBe(403);
   await page.goto('/ayuda');
-  await expect(page.getByRole('heading', { name: 'Casos de la demo ampliada' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Casos preparados' })).toBeVisible();
 });
 
 test('cuatro roles: inicio, guía, destinos del menú y vista móvil sin desbordamiento', async ({ browser }) => {
@@ -83,7 +87,7 @@ test('cuatro roles: inicio, guía, destinos del menú y vista móvil sin desbord
       await page.setViewportSize({ width: 1360, height: 900 });
     }
     await page.goto('/ayuda');
-    await expect(page.getByRole('heading', { name: 'Tu recorrido de demostración' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recorrido del sistema' })).toBeVisible();
     await context.close();
   }
 });
@@ -93,7 +97,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   page.on('dialog', dialog => dialog.accept());
   await login(page, 'interno');
   await page.goto('/rotes');
-  const cycle = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Convocatoria de demostración · Medicina Interna' }) });
+  const cycle = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Convocatoria · Medicina Interna' }) });
   const cycleId = await cycle.getAttribute('data-cycle-id');
   const startDay = (await cycle.locator('.card-head .help').textContent()).match(/\d{4}-\d{2}-\d{2}/)[0];
   await cycle.getByText('Registrar mis preferencias', { exact: true }).click();
@@ -109,7 +113,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await cycle.getByRole('button', { name: 'Cerrar postulaciones' }).click();
   await page.goto('/escenarios');
   const simulation = page.locator('form[action$="/escenarios/simular"]');
-  await simulation.locator('[name=cycle_id]').selectOption({ label: 'Convocatoria de demostración · Medicina Interna' });
+  await simulation.locator('[name=cycle_id]').selectOption({ label: 'Convocatoria · Medicina Interna' });
   await simulation.locator('[name=name]').fill('Demo calculada en navegador');
   await simulation.getByRole('button', { name: 'Simular nueve combinaciones' }).click();
   const study = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Demo calculada en navegador', exact: true }) });
@@ -134,7 +138,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await run.getByRole('button', { name: 'Publicar asignaciones' }).click();
   await expect(page.getByRole('status')).toContainText('Asignaciones publicadas');
   await page.goto('/reportes');
-  await page.locator('form').filter({ hasText: 'Convocatoria de demostración · Medicina Interna' }).getByRole('button', { name: 'Generar acta PDF' }).click();
+  await page.locator('form').filter({ hasText: 'Convocatoria · Medicina Interna' }).getByRole('button', { name: 'Generar acta PDF' }).click();
   await pdf(page);
   await logout(page);
 
@@ -150,7 +154,7 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await page.goto('/guardias');
   const shifts = page.locator('form[action$="/guardias/generar"]');
   await shifts.locator('[name=name]').fill('Guardia de Ana · demo navegador');
-  const ana = await shifts.locator('option').filter({ hasText: 'Ana Demo' }).getAttribute('value');
+  const ana = await shifts.locator('option').filter({ hasText: 'Ana López' }).getAttribute('value');
   await shifts.locator('select').selectOption(ana);
   await shifts.locator('[name="slots[0][starts_at]"]').fill(`${startDay}T10:00`);
   await shifts.locator('[name="slots[0][ends_at]"]').fill(`${startDay}T16:00`);
@@ -164,11 +168,11 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   await login(page, 'interno');
   await page.goto('/guardias');
   await expect(page.locator('main')).toContainText('Guardia de Ana · demo navegador');
-  await expect(page.locator('main')).toContainText('Dra. Lucía Demo');
+  await expect(page.locator('main')).toContainText('Dra. Lucía Fernández');
   await logout(page);
   await login(page, 'tutor');
   await page.goto('/seguimiento');
-  const camila = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Camila Clínica Demo', exact: true }) });
+  const camila = page.locator('section.card').filter({ has: page.getByRole('heading', { name: 'Camila Rojas', exact: true }) });
   await camila.getByText('Registrar asistencia y evaluación', { exact: true }).click();
   const record = camila.locator('form[action$="/registro"]');
   await record.locator('[name=date]').fill(today());
@@ -178,13 +182,13 @@ test('demo completa: simulación real, publicación, planificación de guardia y
   }
   await record.getByRole('button', { name: 'Guardar seguimiento' }).click();
   await expect(page.getByRole('status')).toContainText('Seguimiento registrado');
-  await page.getByRole('row').filter({ hasText: 'Camila Clínica Demo' }).getByRole('button', { name: 'Confirmar realizada' }).click();
+  await page.getByRole('row').filter({ hasText: 'Camila Rojas' }).getByRole('button', { name: 'Confirmar realizada' }).click();
   await expect(page.getByRole('status')).toContainText('Cumplimiento de guardia registrado');
   await logout(page);
 
   await login(page, 'interno.clinico');
   await page.goto('/seguimiento');
-  await expect(page.locator('main')).not.toContainText('Ana Demo');
+  await expect(page.locator('main')).not.toContainText('Ana López');
   await page.getByText('Historial de seguimiento (1)', { exact: true }).click();
   await expect(page.getByRole('cell', { name: '80', exact: true })).toBeVisible();
   await page.getByText('Reportar incidencia o solicitar ajuste', { exact: true }).click();

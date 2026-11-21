@@ -17,7 +17,9 @@ class ShiftController extends Controller
     public function index(): View
     {
         $manager = (auth()->user()->managesAcademics());
-        $assignments = ClinicalController::assignments()->get();
+        $assignments = $manager ? ClinicalController::assignments()
+            ->whereNull('cycles.deleted_at')->whereNull('places.deleted_at')->whereNull('users.deleted_at')
+            ->where('cycles.ends_on', '>=', now()->toDateString())->orderBy('users.name')->orderBy('cycles.starts_on')->get() : collect();
         $tutors = DB::table('users')->whereNull('deleted_at')->whereNotNull('access_approved_at')->where('role', 'tutor')->where('active', true)->get();
         $availability = DB::table('availabilities')->join('users', 'users.id', '=', 'availabilities.tutor_id')->when(! $manager, fn ($q) => $q->where('tutor_id', auth()->id()))->select('availabilities.*', 'users.name')->orderBy('starts_at')->get();
         $shifts = DB::table('shifts')->join('shift_batches', 'shift_batches.id', '=', 'shifts.batch_id')->join('assignments', 'assignments.id', '=', 'shifts.assignment_id')->join('users as intern', 'intern.id', '=', 'assignments.user_id')->leftJoin('users as tutor', 'tutor.id', '=', 'shifts.tutor_id')
@@ -41,8 +43,8 @@ class ShiftController extends Controller
         $data = $request->validate(['tutor_id' => 'required|exists:users,id', 'starts_at' => ['required', 'date', 'after_or_equal:today'], 'ends_at' => ['required', 'date', 'after:starts_at']]);
         abort_unless(auth()->user()->role !== 'tutor' || (int) $data['tutor_id'] === auth()->id(), 403);
         DB::transaction(function () use ($data) {
-            $tutor = DB::table('users')->where('id', $data['tutor_id'])->lockForUpdate()->first();
-            abort_unless($tutor->role === 'tutor' && $tutor->active && $tutor->access_approved_at, 422);
+            $tutor = DB::table('users')->whereNull('deleted_at')->where('id', $data['tutor_id'])->lockForUpdate()->first();
+            abort_unless($tutor && $tutor->role === 'tutor' && $tutor->active && $tutor->access_approved_at, 422);
             DB::table('availabilities')->insert([...$data, 'created_at' => now(), 'updated_at' => now()]);
             Audit::record('disponibilidad.registrada', ['tutor' => $tutor->id]);
         });

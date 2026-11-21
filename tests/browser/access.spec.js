@@ -87,7 +87,7 @@ test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar c
   await login(page, accountFor('coordinador'));
   await page.goto('/gestion/habilitaciones');
   await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Completar datos' }).click();
-  await page.locator('[name=cohort_id]').selectOption({ label: `Cohorte de acceso ${stamp}` });
+  await page.locator('[name=cohort_id]').selectOption({ label: 'Sí' });
   await page.locator('[name=matricula]').fill(`LP-${stamp}`);
   await page.locator('[name=academic_average]').fill('88');
   await page.locator('[name=merit]').fill('75');
@@ -124,13 +124,14 @@ test('crear interno, habilitar datos, ingresar, cambiar contraseña y eliminar c
   await login(page, accountFor('admin'));
   await page.goto('/gestion/usuarios');
   await page.getByRole('row').filter({ hasText: account.email }).getByRole('link', { name: 'Editar', exact: true }).click();
-  await page.locator('[name=reason]').fill('Cuenta temporal retirada al terminar la prueba de navegador.');
+  const reason = `Cuenta temporal ${stamp} retirada al terminar la prueba de navegador.`;
+  await page.locator('[name=reason]').fill(reason);
   await page.getByRole('button', { name: 'Eliminar registro', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Registro eliminado');
   await expect(page.getByRole('row').filter({ hasText: account.email })).toHaveCount(0);
   await page.goto('/bitacora');
-  const deletion = page.getByRole('row').filter({ hasText: 'gestion.eliminada' }).filter({ hasText: account.email });
-  await expect(deletion).toContainText('Cuenta temporal retirada');
+  const deletion = page.getByRole('row').filter({ hasText: 'Registro archivado' }).filter({ hasText: reason });
+  await expect(deletion).toHaveCount(1);
   await expect(page.locator('main')).not.toContainText(replacement);
   await logout(page);
   await page.locator('[name=email]').fill(account.email);

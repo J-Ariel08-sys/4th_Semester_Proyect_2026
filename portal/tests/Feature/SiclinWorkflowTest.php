@@ -6,7 +6,10 @@ use App\Models\User;
 use App\Notifications\AssignmentPublished;
 use App\Services\DecisionAnalysis;
 use App\Services\RotationOptimizer;
+use App\Services\XlsxRows;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -81,6 +84,21 @@ class SiclinWorkflowTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_audit_shows_descriptions_without_access_hashes_or_document_tokens(): void
+    {
+        $this->seed();
+        DB::table('audit_logs')->insert([
+            ['created_at' => now(), 'action' => 'sesion.fallida', 'details' => json_encode(['identificador' => 'hash-de-prueba'])],
+            ['created_at' => now(), 'action' => 'acta.emitida', 'details' => json_encode(['token' => 'token-de-prueba'])],
+            ['created_at' => now(), 'action' => 'gestion.eliminada', 'details' => json_encode(['recurso' => 'hospitales', 'motivo' => 'Convenio finalizado', 'registro' => ['nombre' => 'registro-interno-prueba']])],
+        ]);
+
+        $this->actingAs($this->user('admin'))->get(route('audit'))->assertOk()
+            ->assertSee('Intento de inicio de sesión fallido')->assertSee('Acta PDF emitida')
+            ->assertSee('Motivo: Convenio finalizado')->assertDontSee('hash-de-prueba')
+            ->assertDontSee('token-de-prueba')->assertDontSee('registro-interno-prueba');
+    }
+
     public function test_login_locks_after_five_failures_and_password_reset_revokes_sessions(): void
     {
         $this->seed();
@@ -112,6 +130,44 @@ class SiclinWorkflowTest extends TestCase
         }
         $this->get(route('scenarios'))->assertOk();
         $this->get(route('audit'))->assertForbidden();
+    }
+
+    public function test_rotations_lists_today_and_future_and_blocks_past_applications(): void
+    {
+        $this->seed();
+        $this->applyAndClose();
+        $past = DB::table('cycles')->first();
+        DB::table('cycles')->where('id', $past->id)->update([
+            'name' => 'Convocatoria pasada',
+            'status' => 'abierta',
+            'starts_on' => now()->subDay()->toDateString(),
+            'opens_at' => now()->subDays(2),
+            'closes_at' => now()->addDay(),
+        ]);
+        foreach (['Convocatoria de hoy' => now(), 'Convocatoria futura' => now()->addDay()] as $name => $date) {
+            DB::table('cycles')->insert([
+                'name' => $name,
+                'specialty_id' => $past->specialty_id,
+                'starts_on' => $date->toDateString(),
+                'ends_on' => $date->toDateString(),
+                'opens_at' => now()->subDays(2),
+                'closes_at' => now()->subDay(),
+                'status' => 'abierta',
+            ]);
+        }
+
+        $this->actingAs($this->user('interno2'))->get(route('rotations'))
+            ->assertOk()->assertSeeInOrder(['Convocatoria de hoy', 'Convocatoria futura'])
+            ->assertDontSee('Convocatoria pasada')->assertDontSee('Registrar mis preferencias');
+        $place = DB::table('places')->where('cycle_id', $past->id)->value('id');
+        $this->post(route('applications.store', $past->id), ['preferences' => [$place]])
+            ->assertSessionHasErrors('preferences');
+        $this->assertDatabaseCount('applications', 1);
+
+        $receipt = DB::table('applications')->where('cycle_id', $past->id)->value('receipt');
+        $this->actingAs($this->user('interno'))->get(route('rotations'))->assertOk()
+            ->assertSee('Comprobantes anteriores')->assertSee(route('applications.receipt', $receipt))
+            ->assertDontSee('data-cycle-id="'.$past->id.'"', false);
     }
 
     public function test_management_validates_capacity_and_escapes_names(): void
@@ -213,6 +269,38 @@ class SiclinWorkflowTest extends TestCase
         $this->assertDatabaseCount('scenario_studies', 2);
     }
 
+    public function test_scenario_excel_import_calculates_and_exports_results(): void
+    {
+        $this->seed();
+        $this->actingAs($this->user('coordinador'));
+        $template = $this->get(route('scenarios.template'))->assertOk()->assertDownload('SICLIN-plantilla-escenarios.xlsx');
+        $data = [
+            'name' => 'Cupos estimados por Coordinación',
+            'source' => 'Proyección de prueba',
+            'alpha' => '0.5',
+            'orientation' => 'benefits',
+        ];
+        $this->post(route('scenarios.import'), $data + ['file' => UploadedFile::fake()->createWithContent('escenarios.xlsx', 'archivo inválido')])
+            ->assertSessionHasErrors('file');
+        $this->assertDatabaseCount('scenario_studies', 1);
+
+        $this->post(route('scenarios.import'), $data + ['file' => UploadedFile::fake()->createWithContent('escenarios.xlsx', $template->getContent())])
+            ->assertSessionHasNoErrors();
+        $study = DB::table('scenario_studies')->where('name', $data['name'])->first();
+        $result = json_decode($study->result, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['A3'], $result['winners']['maximin']);
+        $this->assertSame($data['source'], $result['source']);
+
+        $pdf = $this->get(route('scenarios.export', [$study->id, 'pdf']))->assertOk()->assertDownload('SICLIN-escenario-'.$study->id.'.pdf');
+        $this->assertStringStartsWith('%PDF-', $pdf->getContent());
+        $xlsx = $this->get(route('scenarios.export', [$study->id, 'xlsx']))->assertOk()->assertDownload('SICLIN-escenario-'.$study->id.'.xlsx');
+        $file = UploadedFile::fake()->createWithContent('resultados.xlsx', $xlsx->getContent());
+        $rows = app(XlsxRows::class)->read($file->getRealPath(), 6, 40);
+        $this->assertContains(['Criterios de decisión', '', '', '', '', ''], $rows);
+
+        $this->actingAs($this->user('interno'))->get(route('scenarios.export', [$study->id, 'pdf']))->assertForbidden();
+    }
+
     public function test_pdf_contains_snapshot_and_verification_does_not_expose_intern_names(): void
     {
         $this->seed();
@@ -227,6 +315,26 @@ class SiclinWorkflowTest extends TestCase
         $this->post(route('logout'));
         $this->get(route('reports.verify', $report->token))->assertOk()->assertSee('Documento registrado e íntegro')->assertDontSee('Ana Demo');
         $this->actingAs($this->user('interno2'))->get(route('reports.download', $report->token))->assertForbidden();
+    }
+
+    public function test_report_storage_failure_leaves_no_report_or_success_audit(): void
+    {
+        $this->seed();
+        $this->approve();
+        $cycle = DB::table('cycles')->value('id');
+        $disk = \Mockery::mock(FilesystemAdapter::class);
+        Storage::shouldReceive('disk')->with('local')->andReturn($disk);
+        $disk->shouldReceive('put')->twice()->andReturn(false);
+
+        $this->from(route('reports'))->post(route('reports.create', $cycle))
+            ->assertRedirect(route('reports'))->assertSessionHasErrors('documento')->assertSessionMissing('status');
+
+        $this->actingAs($this->user('interno'))->from(route('reports'))->post(route('reports.personal'))
+            ->assertRedirect(route('reports'))->assertSessionHasErrors('documento')->assertSessionMissing('status');
+
+        $this->assertDatabaseCount('reports', 0);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'acta.emitida']);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'libreta.emitida']);
     }
 
     public function test_shift_availability_rest_approval_and_completion(): void
