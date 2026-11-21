@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\AssignmentPublished;
 use App\Services\DecisionAnalysis;
 use App\Services\RotationOptimizer;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -227,6 +228,26 @@ class SiclinWorkflowTest extends TestCase
         $this->post(route('logout'));
         $this->get(route('reports.verify', $report->token))->assertOk()->assertSee('Documento registrado e íntegro')->assertDontSee('Ana Demo');
         $this->actingAs($this->user('interno2'))->get(route('reports.download', $report->token))->assertForbidden();
+    }
+
+    public function test_report_storage_failure_leaves_no_report_or_success_audit(): void
+    {
+        $this->seed();
+        $this->approve();
+        $cycle = DB::table('cycles')->value('id');
+        $disk = \Mockery::mock(FilesystemAdapter::class);
+        Storage::shouldReceive('disk')->with('local')->andReturn($disk);
+        $disk->shouldReceive('put')->twice()->andReturn(false);
+
+        $this->from(route('reports'))->post(route('reports.create', $cycle))
+            ->assertRedirect(route('reports'))->assertSessionHasErrors('documento')->assertSessionMissing('status');
+
+        $this->actingAs($this->user('interno'))->from(route('reports'))->post(route('reports.personal'))
+            ->assertRedirect(route('reports'))->assertSessionHasErrors('documento')->assertSessionMissing('status');
+
+        $this->assertDatabaseCount('reports', 0);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'acta.emitida']);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'libreta.emitida']);
     }
 
     public function test_shift_availability_rest_approval_and_completion(): void
