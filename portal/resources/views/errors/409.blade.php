@@ -1,0 +1,1 @@
+<x-layout title="Revisar operación"><section class="card"><p class="eyebrow">REVISIÓN NECESARIA</p><h1>La operación no está disponible</h1><p>{{ $exception->getMessage() ?: 'El registro cambió o la operación ya fue procesada.' }}</p><a class="button" href="{{ route('dashboard') }}">Volver al panel</a></section></x-layout>

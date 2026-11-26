@@ -1,0 +1,10 @@
+{
+  "plazas": [{"id":"hospital-a","capacidad":3,"reserva":1},{"id":"hospital-b","capacidad":3,"reserva":1}],
+  "internos": [
+    {"id":"interno-1","habilitado":true,"merito":85,"preferencias":["hospital-a","hospital-b"],"plazaAnterior":null},
+    {"id":"interno-2","habilitado":true,"merito":80,"preferencias":["hospital-b","hospital-a"],"plazaAnterior":null},
+    {"id":"interno-3","habilitado":true,"merito":78,"preferencias":["hospital-a","hospital-b"],"plazaAnterior":null}
+  ],
+  "politica":{"pesoPreferencias":5,"pesoMerito":3,"pesoEquilibrio":3,"pesoCambios":5},
+  "segundos":2
+}

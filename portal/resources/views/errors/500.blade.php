@@ -1,0 +1,1 @@
+<x-layout title="Error"><section class="card"><h1>No se pudo completar la operación</h1><p>Intenta nuevamente. Si el problema continúa, contacta al administrador.</p><a href="{{ route('dashboard') }}">Volver al inicio</a></section></x-layout>

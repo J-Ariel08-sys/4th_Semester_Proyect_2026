@@ -1,0 +1,9 @@
+.git
+.mvn
+optimizer-rotes
+# Keep compiled JVM output for the original src/main/docker/Dockerfile.jvm.
+target/*
+!target/quarkus-app/
+!target/*-runner
+!target/*-runner.jar
+!target/lib/

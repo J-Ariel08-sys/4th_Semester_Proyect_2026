@@ -1,0 +1,1 @@
+<x-layout title="No encontrado"><section class="card"><h1>No encontramos este registro</h1><p>Comprueba el enlace o vuelve al panel.</p><a class="button" href="{{ route('dashboard') }}">Volver al panel</a></section></x-layout>

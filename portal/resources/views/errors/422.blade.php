@@ -1,0 +1,1 @@
+<x-layout title="Revisar datos"><section class="card"><h1>Revisa las condiciones de la operación</h1><p>{{ $exception->getMessage() ?: 'Los datos no cumplen los requisitos para continuar.' }}</p><a class="button" href="{{ route('dashboard') }}">Volver al panel</a></section></x-layout>
